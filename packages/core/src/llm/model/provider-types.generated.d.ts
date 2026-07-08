@@ -245,12 +245,12 @@ export type ProviderModelsMap = {
   readonly stackit: readonly [
     'Qwen/Qwen3-VL-235B-A22B-Instruct-FP8',
     'Qwen/Qwen3-VL-Embedding-8B',
+    'Qwen/Qwen3.6-27B',
     'cortecs/Llama-3.3-70B-Instruct-FP8-Dynamic',
     'google/gemma-3-27b-it',
     'intfloat/e5-mistral-7b-instruct',
-    'neuralmagic/Meta-Llama-3.1-8B-Instruct-FP8',
-    'neuralmagic/Mistral-Nemo-Instruct-2407-FP8',
     'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
   ];
   readonly vercel: readonly [
     'alibaba/qwen-3-14b',
@@ -286,16 +286,18 @@ export type ProviderModelsMap = {
     'alibaba/wan-v2.6-r2v',
     'alibaba/wan-v2.6-r2v-flash',
     'alibaba/wan-v2.6-t2v',
+    'alibaba/wan-v2.7-r2v',
+    'alibaba/wan-v2.7-t2v',
     'amazon/nova-2-lite',
     'amazon/nova-lite',
     'amazon/nova-micro',
     'amazon/nova-pro',
     'amazon/titan-embed-text-v2',
+    'anthropic/claude-3-haiku',
     'anthropic/claude-3.5-haiku',
     'anthropic/claude-fable-5',
     'anthropic/claude-haiku-4.5',
     'anthropic/claude-opus-4',
-    'anthropic/claude-opus-4.1',
     'anthropic/claude-opus-4.5',
     'anthropic/claude-opus-4.6',
     'anthropic/claude-opus-4.7',
@@ -602,6 +604,7 @@ export type ProviderModelsMap = {
     'moonshotai/Kimi-K2.6',
     'moonshotai/Kimi-K2.7-Code',
     'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
     'stepfun-ai/Step-3.5-Flash',
     'stepfun-ai/Step-3.7-Flash',
     'zai-org/GLM-4.5',
@@ -799,12 +802,15 @@ export type ProviderModelsMap = {
   ];
   readonly vultr: readonly [
     'MiniMaxAI/MiniMax-M2.7',
+    'Qwen/Qwen3.5-397B-A17B',
+    'Qwen/Qwen3.6-27B',
+    'XiaomiMiMo/MiMo-V2.5-Pro',
+    'deepseek-ai/DeepSeek-V4-Flash',
     'moonshotai/Kimi-K2.6',
     'nvidia/DeepSeek-V3.2-NVFP4',
-    'nvidia/Llama-3.1-Nemotron-Safety-Guard-8B-v3',
     'nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16',
     'nvidia/Nemotron-Cascade-2-30B-A3B',
-    'zai-org/GLM-5.1-FP8',
+    'zai-org/GLM-5.2-FP8',
   ];
   readonly '302ai': readonly [
     'MiniMax-M1',
@@ -1032,6 +1038,7 @@ export type ProviderModelsMap = {
     'deepseek-v4-pro',
     'gemini-3.1-flash-lite-preview',
     'gemini-3.1-pro-preview',
+    'glm-5.2',
     'gpt-5-mini',
     'gpt-5.1-codex',
     'gpt-5.1-codex-max',
@@ -1196,6 +1203,8 @@ export type ProviderModelsMap = {
     'fal-ai/stable-audio-25/text-to-audio',
     'gemma-4-31B-it',
     'glm-5',
+    'glm-5.1',
+    'glm-5.2',
     'gte-large-en-v1.5',
     'kimi-k2.5',
     'kimi-k2.6',
@@ -1243,7 +1252,7 @@ export type ProviderModelsMap = {
     'stable-diffusion-3.5-large',
     'wan2-2-t2v-a14b',
   ];
-  readonly subconscious: readonly ['subconscious/tim-qwen3.6-27b'];
+  readonly subconscious: readonly ['subconscious/glm-5.2', 'subconscious/tim-qwen3.6-27b'];
   readonly lmstudio: readonly ['openai/gpt-oss-20b', 'qwen/qwen3-30b-a3b-2507', 'qwen/qwen3-coder-30b'];
   readonly poolside: readonly ['poolside/laguna-m.1', 'poolside/laguna-xs.2'];
   readonly zenmux: readonly [
@@ -1881,8 +1890,6 @@ export type ProviderModelsMap = {
   ];
   readonly llmgateway: readonly [
     'auto',
-    'claude-3-7-sonnet',
-    'claude-3-7-sonnet-20250219',
     'claude-3-opus',
     'claude-fable-5',
     'claude-haiku-4-5',
@@ -2201,10 +2208,20 @@ export type ProviderModelsMap = {
   readonly sakana: readonly ['fugu', 'fugu-ultra', 'fugu-ultra-20260615'];
   readonly deepinfra: readonly [
     'MiniMaxAI/MiniMax-M2.5',
+    'MiniMaxAI/MiniMax-M2.7',
+    'MiniMaxAI/MiniMax-M3',
+    'Qwen/Qwen3-32B',
     'Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo',
+    'Qwen/Qwen3-Max',
+    'Qwen/Qwen3-Next-80B-A3B-Instruct',
+    'Qwen/Qwen3.5-122B-A10B',
+    'Qwen/Qwen3.5-27B',
     'Qwen/Qwen3.5-35B-A3B',
     'Qwen/Qwen3.5-397B-A17B',
+    'Qwen/Qwen3.5-9B',
+    'Qwen/Qwen3.6-27B',
     'Qwen/Qwen3.6-35B-A3B',
+    'Qwen/Qwen3.7-Max',
     'XiaomiMiMo/MiMo-V2.5',
     'XiaomiMiMo/MiMo-V2.5-Pro',
     'deepseek-ai/DeepSeek-R1-0528',
@@ -2219,6 +2236,9 @@ export type ProviderModelsMap = {
     'moonshotai/Kimi-K2.5',
     'moonshotai/Kimi-K2.6',
     'moonshotai/Kimi-K2.7-Code',
+    'nvidia/Llama-3.3-Nemotron-Super-49B-v1.5',
+    'nvidia/Nemotron-3-Nano-30B-A3B',
+    'nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning',
     'openai/gpt-oss-120b',
     'openai/gpt-oss-20b',
     'zai-org/GLM-4.6',
@@ -2314,6 +2334,7 @@ export type ProviderModelsMap = {
     'stepfun-ai/step-3.5-flash',
     'stepfun-ai/step-3.7-flash',
     'upstage/solar-10_7b-instruct',
+    'z-ai/glm-5.2',
   ];
   readonly evroc: readonly [
     'KBLab/kb-whisper-large',
@@ -2338,17 +2359,11 @@ export type ProviderModelsMap = {
     'claude-fable-5',
     'claude-haiku-4-5',
     'claude-haiku-4-5-20251001',
-    'claude-opus-4-0',
-    'claude-opus-4-1',
-    'claude-opus-4-1-20250805',
-    'claude-opus-4-20250514',
     'claude-opus-4-5',
     'claude-opus-4-5-20251101',
     'claude-opus-4-6',
     'claude-opus-4-7',
     'claude-opus-4-8',
-    'claude-sonnet-4-0',
-    'claude-sonnet-4-20250514',
     'claude-sonnet-4-5',
     'claude-sonnet-4-5-20250929',
     'claude-sonnet-4-6',
@@ -2416,6 +2431,7 @@ export type ProviderModelsMap = {
     'gpt-5.5',
     'gpt-5.5-pro',
     'grok-build-0.1',
+    'hy3-free',
     'kimi-k2.5',
     'kimi-k2.6',
     'kimi-k2.7-code',
@@ -2492,6 +2508,7 @@ export type ProviderModelsMap = {
     'qwen3.7-max',
     'qwen3.7-plus',
   ];
+  readonly longcat: readonly ['LongCat-2.0'];
   readonly poe: readonly [
     'anthropic/claude-haiku-3',
     'anthropic/claude-haiku-3.5',
@@ -2936,6 +2953,7 @@ export type ProviderModelsMap = {
     'minimax/minimax-m2.1',
     'minimax/minimax-m2.5',
     'minimax/minimax-m2.7',
+    'minimax/minimax-m3',
     'mistralai/codestral-2508',
     'mistralai/devstral-2512',
     'mistralai/devstral-medium',
@@ -3241,9 +3259,9 @@ export type ProviderModelsMap = {
   ];
   readonly openrouter: readonly [
     'ai21/jamba-large-1.7',
-    'aion-labs/aion-1.0',
-    'aion-labs/aion-1.0-mini',
     'aion-labs/aion-2.0',
+    'aion-labs/aion-3.0',
+    'aion-labs/aion-3.0-mini',
     'aion-labs/aion-rp-llama-3.1-8b',
     'allenai/olmo-3-32b-think',
     'amazon/nova-2-lite-v1',
@@ -3386,6 +3404,7 @@ export type ProviderModelsMap = {
     'moonshotai/kimi-k2.7-code',
     'morph/morph-v3-fast',
     'morph/morph-v3-large',
+    'nex-agi/nex-n2-mini',
     'nex-agi/nex-n2-pro',
     'nousresearch/hermes-3-llama-3.1-405b',
     'nousresearch/hermes-3-llama-3.1-405b:free',
@@ -3544,7 +3563,9 @@ export type ProviderModelsMap = {
     'stepfun/step-3.7-flash',
     'switchpoint/router',
     'tencent/hunyuan-a13b-instruct',
+    'tencent/hy3',
     'tencent/hy3-preview',
+    'tencent/hy3:free',
     'thedrummer/cydonia-24b-v4.1',
     'thedrummer/rocinante-12b',
     'thedrummer/skyfall-36b-v2',
@@ -3819,7 +3840,7 @@ export type ProviderModelsMap = {
     'z-ai/glm-5.1',
   ];
   readonly 'abliteration-ai': readonly ['abliterated-model'];
-  readonly xpersona: readonly ['xpersona-frieren-coder', 'xpersona-gpt-5.5'];
+  readonly xpersona: readonly ['claude-fable-5', 'xpersona-frieren-coder', 'xpersona-gpt-5.5'];
   readonly baseten: readonly [
     'deepseek-ai/DeepSeek-V4-Pro',
     'moonshotai/Kimi-K2.5',

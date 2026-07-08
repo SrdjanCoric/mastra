@@ -31,11 +31,6 @@ const sidebars = {
       items: [
         {
           type: 'doc',
-          id: 'getting-started/project-structure',
-          label: 'Project Structure',
-        },
-        {
-          type: 'doc',
           id: 'getting-started/manual-install',
           label: 'Manual Install',
         },
@@ -43,6 +38,11 @@ const sidebars = {
           type: 'doc',
           id: 'getting-started/build-with-ai',
           label: 'Build with AI',
+        },
+        {
+          type: 'doc',
+          id: 'storage/overview',
+          label: 'Storage',
         },
       ],
     },
@@ -138,9 +138,6 @@ const sidebars = {
                   type: 'doc',
                   id: 'agents/sdk-agents',
                   label: 'SDK Agents',
-                  customProps: {
-                    tags: ['new'],
-                  },
                 },
                 {
                   type: 'category',
@@ -228,11 +225,6 @@ const sidebars = {
               type: 'doc',
               id: 'memory/overview',
               label: 'Overview',
-            },
-            {
-              type: 'doc',
-              id: 'memory/storage',
-              label: 'Storage',
             },
             {
               type: 'doc',
@@ -469,6 +461,11 @@ const sidebars = {
               id: 'voice/speech-to-speech',
               label: 'Speech to Speech',
             },
+            {
+              type: 'doc',
+              id: 'voice/livekit',
+              label: 'LiveKit',
+            },
           ],
         },
       ],
@@ -505,8 +502,8 @@ const sidebars = {
         },
         {
           type: 'doc',
-          id: 'long-running-agents/heartbeats',
-          label: 'Heartbeats',
+          id: 'long-running-agents/schedules',
+          label: 'Schedules',
           customProps: {
             tags: ['beta'],
           },
@@ -610,9 +607,6 @@ const sidebars = {
               type: 'doc',
               id: 'server/pubsub',
               label: 'PubSub',
-              customProps: {
-                tags: ['new'],
-              },
             },
             {
               type: 'doc',
@@ -726,6 +720,11 @@ const sidebars = {
               type: 'doc',
               id: 'observability/logging',
               label: 'Logging',
+            },
+            {
+              type: 'doc',
+              id: 'observability/feedback',
+              label: 'Feedback',
             },
             {
               type: 'category',
