@@ -362,6 +362,95 @@ describe('RailwaySandbox', () => {
       expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(2);
       expect(mockSandbox.checkpoint).toHaveBeenLastCalledWith('mastracode-repo-abc123');
     });
+
+    it('pings the sandbox to keep it awake before capturing the pre-idle checkpoint', async () => {
+      vi.useFakeTimers();
+      mockCreate.mockRejectedValueOnce(new Error('checkpoint not found')).mockResolvedValueOnce(mockSandbox);
+
+      const sandbox = new RailwaySandbox({
+        token: 'tok',
+        checkpointName: 'mastracode-repo-abc123',
+        idleTimeoutMinutes: 1,
+        template: t => t.run('npm i -g pnpm'),
+      });
+      await sandbox._start();
+      mockSandbox.exec.mockClear();
+
+      await vi.advanceTimersByTimeAsync(50_000);
+
+      expect(mockSandbox.exec).toHaveBeenCalledWith('true');
+      expect(mockSandbox.exec.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSandbox.checkpoint.mock.invocationCallOrder.at(-1)!,
+      );
+    });
+
+    it('reschedules the keepalive+checkpoint refresh after each idle window', async () => {
+      vi.useFakeTimers();
+      mockCreate.mockRejectedValueOnce(new Error('checkpoint not found')).mockResolvedValueOnce(mockSandbox);
+
+      const sandbox = new RailwaySandbox({
+        token: 'tok',
+        checkpointName: 'mastracode-repo-abc123',
+        idleTimeoutMinutes: 1,
+        template: t => t.run('npm i -g pnpm'),
+      });
+      await sandbox._start();
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(50_000);
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(50_000);
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(3);
+    });
+
+    it('debounces the refresh: each sandbox action resets the pre-idle timer', async () => {
+      vi.useFakeTimers();
+      mockCreate.mockRejectedValueOnce(new Error('checkpoint not found')).mockResolvedValueOnce(mockSandbox);
+
+      const sandbox = new RailwaySandbox({
+        token: 'tok',
+        checkpointName: 'mastracode-repo-abc123',
+        idleTimeoutMinutes: 1,
+        template: t => t.run('npm i -g pnpm'),
+      });
+      await sandbox._start();
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(1);
+
+      // 30s in, an action lands — timer resets to fire 50s from now (T+80s).
+      await vi.advanceTimersByTimeAsync(30_000);
+      await sandbox.executeCommand('echo hi');
+
+      // T+79s: original T+50s deadline has passed without a refresh.
+      await vi.advanceTimersByTimeAsync(49_000);
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(1);
+
+      // T+80s: the debounced timer fires.
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(2);
+    });
+
+    it('stops the refresh loop when the keepalive ping fails', async () => {
+      vi.useFakeTimers();
+      mockCreate.mockRejectedValueOnce(new Error('checkpoint not found')).mockResolvedValueOnce(mockSandbox);
+
+      const sandbox = new RailwaySandbox({
+        token: 'tok',
+        checkpointName: 'mastracode-repo-abc123',
+        idleTimeoutMinutes: 1,
+        template: t => t.run('npm i -g pnpm'),
+      });
+      await sandbox._start();
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(1);
+
+      mockSandbox.exec.mockRejectedValueOnce(new Error('sandbox not found'));
+      await vi.advanceTimersByTimeAsync(50_000);
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(1);
+
+      // No reschedule after failure — the next real action restarts the loop.
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(mockSandbox.checkpoint).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('fork', () => {

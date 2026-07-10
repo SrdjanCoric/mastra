@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Capture DB updates without a real Postgres. `getAppDb()` returns a chainable
-// stub whose terminal `.where()` records the `set(...)` payload.
+// stub whose terminal `.where()` records the `set(...)` payload. Selects
+// resolve to whatever `dbSelectRows` holds.
 const dbUpdates: Array<Record<string, unknown>> = [];
+const dbSelectRows: Array<Record<string, unknown>> = [];
 vi.mock('./db', () => ({
   getAppDb: () => ({
     update: () => ({
@@ -10,6 +12,11 @@ vi.mock('./db', () => ({
         where: async () => {
           dbUpdates.push(values);
         },
+      }),
+    }),
+    select: () => ({
+      from: () => ({
+        where: async () => dbSelectRows,
       }),
     }),
   }),
@@ -29,6 +36,7 @@ import {
   materializeRepo,
   MaterializeError,
   pushBranch,
+  reattachProjectSandbox,
   resetSandboxFactory,
   resolveGitIdentity,
   safeBranchDir,
@@ -48,6 +56,7 @@ class FakeSandbox implements MaterializationSandbox {
   readonly calls: string[] = [];
   startCount = 0;
   providerId = 'railway-vm-123';
+  stop?: () => Promise<void>;
   private responder: Responder;
 
   constructor(responder?: Responder) {
@@ -88,6 +97,7 @@ function makeRepoInfo(overrides: Partial<RepoMaterializeInfo> = {}): RepoMateria
 
 beforeEach(() => {
   dbUpdates.length = 0;
+  dbSelectRows.length = 0;
 });
 
 afterEach(() => {
@@ -237,8 +247,98 @@ describe('ensureProjectSandbox', () => {
     expect(provided).toEqual(['railway-vm-dead', undefined]);
     expect(result).toBe(fresh);
     expect(fresh.startCount).toBe(1);
-    // The stale id is cleared, then the new provider id persisted.
-    expect(dbUpdates).toEqual([{ sandboxId: null }, { sandboxId: 'railway-vm-new' }]);
+    // The stale id + materialized flag are cleared (the replacement VM may be
+    // blank), then the new provider id persisted.
+    expect(dbUpdates).toEqual([{ sandboxId: null, materializedAt: null }, { sandboxId: 'railway-vm-new' }]);
+  });
+
+  it('passes the stable per-row checkpoint name on both reattach and provision', async () => {
+    const dead = new FakeSandbox();
+    dead.start = async () => {
+      throw new Error('sandbox not found');
+    };
+    const fresh = new FakeSandbox();
+    const checkpointNames: Array<string | undefined> = [];
+    setSandboxFactory(opts => {
+      checkpointNames.push(opts.checkpointName);
+      return opts.providerSandboxId ? dead : fresh;
+    });
+
+    await ensureProjectSandbox(makeRow({ sandboxId: 'railway-vm-dead' }));
+
+    expect(checkpointNames).toEqual(['mastracode-web-sbrow-1', 'mastracode-web-sbrow-1']);
+  });
+});
+
+describe('reattachProjectSandbox', () => {
+  it('reattaches with the row checkpoint name when the provider id is known', async () => {
+    dbSelectRows.push(makeRow({ sandboxId: 'railway-vm-123' }));
+    const sandbox = new FakeSandbox();
+    let factoryArgs: { providerSandboxId?: string; checkpointName?: string } | undefined;
+    setSandboxFactory(opts => {
+      factoryArgs = opts;
+      return sandbox;
+    });
+
+    const result = await reattachProjectSandbox('railway-vm-123');
+
+    expect(result).toBe(sandbox);
+    expect(factoryArgs?.providerSandboxId).toBe('railway-vm-123');
+    expect(factoryArgs?.checkpointName).toBe('mastracode-web-sbrow-1');
+    expect(dbUpdates).toEqual([]);
+  });
+
+  it('recovers a dead sandbox from its checkpoint and persists the new provider id', async () => {
+    dbSelectRows.push(makeRow({ sandboxId: 'railway-vm-dead' }));
+    const dead = new FakeSandbox();
+    dead.start = async () => {
+      throw new Error('sandbox not found');
+    };
+    // Checkpoint-restored replacement: the checkout is present on disk.
+    const replacement = new FakeSandbox(script => (script.startsWith('test -d') ? OK : OK));
+    replacement.providerId = 'railway-vm-new';
+    setSandboxFactory(opts => (opts.providerSandboxId ? dead : replacement));
+
+    const result = await reattachProjectSandbox('railway-vm-dead');
+
+    expect(result).toBe(replacement);
+    expect(replacement.calls).toContain(`test -d '/workspace/hello'/.git`);
+    expect(dbUpdates).toEqual([{ sandboxId: 'railway-vm-new' }]);
+  });
+
+  it('clears the row and throws sandbox-expired when the replacement is a blank box', async () => {
+    dbSelectRows.push(makeRow({ sandboxId: 'railway-vm-dead' }));
+    const dead = new FakeSandbox();
+    dead.start = async () => {
+      throw new Error('sandbox not found');
+    };
+    // No checkpoint existed: the replacement has no checkout.
+    const replacement = new FakeSandbox(script =>
+      script.startsWith('test -d') ? { exitCode: 1, stdout: '', stderr: '' } : OK,
+    );
+    let stopped = 0;
+    replacement.stop = async () => {
+      stopped += 1;
+    };
+    setSandboxFactory(opts => (opts.providerSandboxId ? dead : replacement));
+
+    await expect(reattachProjectSandbox('railway-vm-dead')).rejects.toMatchObject({
+      name: 'MaterializeError',
+      code: 'sandbox-expired',
+    });
+    expect(stopped).toBe(1);
+    expect(dbUpdates).toEqual([{ sandboxId: null, materializedAt: null }]);
+  });
+
+  it('propagates the start failure when no row matches the provider id', async () => {
+    const dead = new FakeSandbox();
+    dead.start = async () => {
+      throw new Error('sandbox not found');
+    };
+    setSandboxFactory(() => dead);
+
+    await expect(reattachProjectSandbox('railway-vm-unknown')).rejects.toThrow('sandbox not found');
+    expect(dbUpdates).toEqual([]);
   });
 });
 

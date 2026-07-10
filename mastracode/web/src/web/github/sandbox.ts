@@ -77,6 +77,13 @@ export type SandboxFactory = (opts: {
   env?: Record<string, string>;
   /** Idle teardown window (minutes). The provider stops the VM after this idle period. */
   idleTimeoutMinutes?: number;
+  /**
+   * Stable per-(project,user) checkpoint key. Providers that support
+   * checkpoints (Railway) restore new VMs from this snapshot and refresh it
+   * shortly before each idle window, so a reclaimed VM can be re-created with
+   * the repo (and uncommitted work) intact. Ignored by the local provider.
+   */
+  checkpointName?: string;
 }) => MaterializationSandbox;
 
 /**
@@ -188,11 +195,12 @@ export class SandboxBudgetError extends Error {
 }
 
 /** Railway-backed sandbox, optionally reattaching by id. */
-const railwayFactory: SandboxFactory = ({ providerSandboxId, env, idleTimeoutMinutes }) =>
+const railwayFactory: SandboxFactory = ({ providerSandboxId, env, idleTimeoutMinutes, checkpointName }) =>
   new RailwaySandbox({
     ...(providerSandboxId ? { sandboxId: providerSandboxId } : {}),
     ...(env ? { env } : {}),
     ...(idleTimeoutMinutes !== undefined ? { idleTimeoutMinutes } : {}),
+    ...(checkpointName ? { checkpointName } : {}),
   });
 
 /** Local host-process sandbox (single-user dev; no tenant isolation). */
@@ -229,6 +237,15 @@ async function readProviderSandboxId(sandbox: MaterializationSandbox): Promise<s
 }
 
 /**
+ * Stable checkpoint key for a per-(project,user) sandbox binding. Derived from
+ * the row id so the same user's sandbox for the same project always refreshes
+ * and restores the same provider checkpoint across VM re-creations.
+ */
+export function sandboxCheckpointName(row: Pick<GithubProjectSandboxRow, 'id'>): string {
+  return `mastracode-web-${row.id}`;
+}
+
+/**
  * Provision a new sandbox (persisting its provider id on first open) or
  * reattach to the stored one. Returns a started, live sandbox.
  */
@@ -237,6 +254,7 @@ export async function ensureProjectSandbox(
   onProgress?: ProgressFn,
 ): Promise<MaterializationSandbox> {
   const idleTimeoutMinutes = getSandboxIdleMinutes();
+  const checkpointName = sandboxCheckpointName(row);
 
   // Reattach path: if we have a stored sandbox id, try to reattach. The VM may
   // have been torn down by the provider's idle GC (or otherwise died), in which
@@ -244,14 +262,19 @@ export async function ensureProjectSandbox(
   // fresh sandbox so the next open succeeds instead of being permanently wedged.
   if (row.sandboxId) {
     reportProgress(onProgress, { phase: 'reattaching', message: 'Reconnecting to your sandbox…' });
-    const reattached = sandboxFactory({ providerSandboxId: row.sandboxId, idleTimeoutMinutes });
+    const reattached = sandboxFactory({ providerSandboxId: row.sandboxId, idleTimeoutMinutes, checkpointName });
     try {
       await reattached.start();
       return reattached;
     } catch {
+      // Clear `materializedAt` along with the stale id: the replacement VM may
+      // be restored from a checkpoint (checkout present → pull) or be a blank
+      // box (→ clone). `materializeRepo` re-detects the checkout on disk, so a
+      // stale "already materialized" flag must not force the pull path onto an
+      // empty filesystem.
       await getAppDb()
         .update(githubProjectSandboxes)
-        .set({ sandboxId: null })
+        .set({ sandboxId: null, materializedAt: null })
         .where(eq(githubProjectSandboxes.id, row.id));
       // fall through to fresh provision below
     }
@@ -264,7 +287,7 @@ export async function ensureProjectSandbox(
   }
 
   reportProgress(onProgress, { phase: 'provisioning', message: 'Provisioning a new sandbox…' });
-  const sandbox = sandboxFactory({ idleTimeoutMinutes });
+  const sandbox = sandboxFactory({ idleTimeoutMinutes, checkpointName });
   await sandbox.start();
   liveSandboxCount += 1;
 
@@ -311,13 +334,63 @@ export async function teardownProjectSandbox(
 /**
  * Reattach to an already-provisioned sandbox by its provider id and start it.
  * Used by the workspace seam when opening a GitHub project that was already
- * materialized (sandbox id + workdir carried on controller state), so no DB
- * round-trip is needed.
+ * materialized (sandbox id + workdir carried on controller state).
+ *
+ * When the VM is gone (provider idle GC), recover instead of failing the
+ * session: provision a replacement restored from the row's checkpoint, verify
+ * the checkout survived, and persist the new provider id on the row. Only when
+ * no checkpoint exists (blank replacement box) does this throw — the SPA's
+ * `/ensure` flow re-materializes the repo on the next project open.
  */
 export async function reattachProjectSandbox(providerSandboxId: string): Promise<MaterializationSandbox> {
-  const sandbox = sandboxFactory({ providerSandboxId, idleTimeoutMinutes: getSandboxIdleMinutes() });
-  await sandbox.start();
-  return sandbox;
+  const idleTimeoutMinutes = getSandboxIdleMinutes();
+  const rows = await getAppDb()
+    .select()
+    .from(githubProjectSandboxes)
+    .where(eq(githubProjectSandboxes.sandboxId, providerSandboxId));
+  const row = rows[0];
+  const checkpointName = row ? sandboxCheckpointName(row) : undefined;
+
+  const sandbox = sandboxFactory({
+    providerSandboxId,
+    idleTimeoutMinutes,
+    ...(checkpointName ? { checkpointName } : {}),
+  });
+  try {
+    await sandbox.start();
+    return sandbox;
+  } catch (err) {
+    if (!row) throw err;
+
+    // VM is gone. Provision a replacement — the provider restores it from the
+    // row's checkpoint when one was captured.
+    const replacement = sandboxFactory({ idleTimeoutMinutes, checkpointName: sandboxCheckpointName(row) });
+    await replacement.start();
+
+    const checkout = await sh(replacement, `test -d ${shellQuote(row.sandboxWorkdir)}/.git`);
+    if (checkout.exitCode !== 0) {
+      // No checkpoint to restore from: the replacement is a blank box. Tear it
+      // down and clear the row so the next open re-provisions + re-clones.
+      await replacement.stop?.().catch(() => {});
+      await getAppDb()
+        .update(githubProjectSandboxes)
+        .set({ sandboxId: null, materializedAt: null })
+        .where(eq(githubProjectSandboxes.id, row.id));
+      throw new MaterializeError(
+        'Your sandbox expired and no checkpoint was available to restore it. Re-open the project to clone the repo into a fresh sandbox.',
+        'sandbox-expired',
+      );
+    }
+
+    const newProviderSandboxId = await readProviderSandboxId(replacement);
+    if (newProviderSandboxId) {
+      await getAppDb()
+        .update(githubProjectSandboxes)
+        .set({ sandboxId: newProviderSandboxId })
+        .where(eq(githubProjectSandboxes.id, row.id));
+    }
+    return replacement;
+  }
 }
 
 /**
@@ -349,7 +422,8 @@ export class MaterializeError extends Error {
       | 'push-failed'
       | 'commit-failed'
       | 'gh-missing'
-      | 'pr-failed',
+      | 'pr-failed'
+      | 'sandbox-expired',
   ) {
     super(message);
     this.name = 'MaterializeError';

@@ -384,6 +384,17 @@ export class RailwaySandbox extends MastraSandbox {
     }
   }
 
+  /**
+   * Debounced pre-idle keepalive + checkpoint loop. Every sandbox action
+   * resets this timer (via `withRestartRetry`). Shortly before Railway's idle
+   * timeout would destroy the VM, the timer fires: a trivial `exec` pings the
+   * sandbox to reset Railway's idle clock (keeping the VM awake), a fresh
+   * checkpoint is captured so the filesystem can be restored if the sandbox is
+   * ever lost, and the timer is rescheduled for the next idle window. Only
+   * active when a `checkpointName` is configured; when this process exits the
+   * loop stops and Railway reclaims the VM one idle window later, with the
+   * latest checkpoint already saved.
+   */
   private _scheduleCheckpointRefresh(): void {
     if (!this._checkpointName || !this._sandbox) {
       return;
@@ -406,17 +417,43 @@ export class RailwaySandbox extends MastraSandbox {
         return;
       }
 
-      const refresh = this._checkpointSandbox(sandbox).finally(() => {
+      const refresh = this._keepAliveAndCheckpoint(sandbox).finally(() => {
         if (this._checkpointRefreshInFlight === refresh) {
           this._checkpointRefreshInFlight = null;
         }
       });
       this._checkpointRefreshInFlight = refresh;
-      this._checkpointRefreshInFlight.catch(error => {
-        this.logger.warn(`${LOG_PREFIX} Failed to refresh Railway sandbox checkpoint ${this._checkpointName}:`, error);
-      });
+      this._checkpointRefreshInFlight.then(
+        () => {
+          // Keep the loop going: the keepalive ping reset Railway's idle
+          // clock, so schedule the next refresh one idle window out (unless an
+          // action already rescheduled it, in which case this just extends the
+          // debounce from now — the refresh itself was the latest interaction).
+          if (this._sandbox) {
+            this._scheduleCheckpointRefresh();
+          }
+        },
+        error => {
+          // Stop the loop on failure (the VM may be gone); the next real
+          // action restarts the sandbox via `withRestartRetry` and reschedules.
+          this.logger.warn(
+            `${LOG_PREFIX} Failed to refresh Railway sandbox checkpoint ${this._checkpointName}:`,
+            error,
+          );
+        },
+      );
     }, delayMs);
     this._checkpointRefreshTimer.unref?.();
+  }
+
+  /**
+   * Ping the sandbox to reset Railway's idle-destroy clock, then capture a
+   * fresh checkpoint. The ping runs first so the VM cannot be reclaimed while
+   * the (potentially slow) checkpoint capture is in flight.
+   */
+  private async _keepAliveAndCheckpoint(sandbox: Sandbox): Promise<void> {
+    await sandbox.exec('true');
+    await this._checkpointSandbox(sandbox);
   }
 
   private _cancelCheckpointRefresh(): void {
