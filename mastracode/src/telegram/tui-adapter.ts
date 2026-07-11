@@ -27,6 +27,9 @@ export function createTelegramTuiBridge(env: NodeJS.ProcessEnv = process.env): T
       if (!client) throw new Error('Telegram broker is not connected.');
       await client.sendMessage(text);
     },
+    health() {
+      return client ? 'connected' : 'disconnected';
+    },
     stop() {
       client?.close();
       client = undefined;

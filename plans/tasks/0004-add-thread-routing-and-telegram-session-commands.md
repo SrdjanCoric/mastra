@@ -12,17 +12,21 @@ Adapt the command-first routing order from `mastracode-remote`'s `telegram-updat
 
 ## AFK tasks
 
-- [ ] Add failing tests for initial thread sync, thread changes, command parsing, stale/unknown commands, status redaction, stop while idle/active/suspended, queued Telegram follow-up clearing, and continued local usability.
-- [ ] Publish short thread-change notices using title or safe short identifier while retaining one project topic.
-- [ ] Build `/status` from live session/TUI/adapter state without prompts or transcript access.
-- [ ] Implement `/stop` through native abort/run-control APIs and clear only queued Telegram-originated follow-ups.
-- [ ] Implement concise `/help` output and reject unsupported remote controls with terminal-only guidance.
+- [x] Add failing tests for initial thread sync, thread changes, command parsing, stale/unknown commands, status redaction, stop while idle/active/suspended, queued Telegram follow-up clearing, and continued local usability.
+- [x] Publish short thread-change notices using title or safe short identifier while retaining one project topic.
+- [x] Build `/status` from live session/TUI/adapter state without prompts or transcript access.
+- [x] Implement `/stop` through native abort/run-control APIs and clear only queued Telegram-originated follow-ups.
+- [x] Implement concise `/help` output and reject unsupported remote controls with terminal-only guidance.
 
 ## Acceptance criteria
 
-- [ ] Telegram follows the TUI's selected thread and never selects or creates threads itself.
-- [ ] `/status` reports project, thread, model, mode, run state, safe current task/tool summary, queued follow-up count, active-turn duration, and Telegram health without sensitive content.
-- [ ] `/stop` aborts active work, clears queued Telegram follow-ups, and leaves the TUI, adapter, and thread alive.
-- [ ] `/help` lists only the three supported commands and explains terminal-only controls.
-- [ ] Unknown slash commands do not reach the model.
-- [ ] Focused integration tests, TUI tests, lint, typecheck, and build pass.
+- [x] Telegram follows the TUI's selected thread and never selects or creates threads itself.
+- [x] `/status` reports project, thread, model, mode, run state, safe current task/tool summary, queued follow-up count, active-turn duration, and Telegram health without sensitive content.
+- [x] `/stop` aborts active work, clears queued Telegram follow-ups, and leaves the TUI, adapter, and thread alive.
+- [x] `/help` lists only the three supported commands and explains terminal-only controls.
+- [x] Unknown slash commands do not reach the model.
+- [x] Focused integration tests, TUI tests, lint, typecheck, and build pass.
+
+## Implementation log
+
+Implemented deterministic command parsing and responses inside the live TUI session, including redacted `/status`, native `/stop`, terminal-only guidance, initial/current thread notices, and adapter health reporting. Extended the checked-in shared-conversation TUI scenario to prove initial thread sync and model-bypassing `/help`/`/status` behavior. Validation passed with 72 focused unit tests, the focused TUI e2e scenario, package lint/typecheck, and `pnpm build:mastracode`.

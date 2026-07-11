@@ -26,6 +26,14 @@ import {
 } from '../onboarding/settings.js';
 import type { LoadedPlugin } from '../plugins/types.js';
 import {
+  formatTelegramHelp,
+  formatTelegramStatus,
+  formatThreadNotice,
+  formatThreadReference,
+  formatUnsupportedTelegramCommand,
+  parseTelegramCommand,
+} from '../telegram/session-commands.js';
+import {
   detectPackageManager,
   fetchChangelog,
   fetchLatestVersion,
@@ -269,6 +277,13 @@ export class MastraTUI {
     if (this.state.options.messageBridge) {
       try {
         await this.state.options.messageBridge.start(text => this.receiveExternalMessage(text));
+        void this.sendTelegramControlMessage(
+          formatThreadNotice(
+            'Following thread',
+            this.state.currentThreadTitle,
+            this.state.session.thread.getId() ?? '',
+          ),
+        );
       } catch (error) {
         showInfo(
           this.state,
@@ -528,8 +543,85 @@ export class MastraTUI {
     });
   }
 
+  private async sendTelegramControlMessage(text: string): Promise<void> {
+    const bridge = this.state.options?.messageBridge;
+    if (!bridge) return;
+    try {
+      await bridge.sendMessage(text);
+    } catch {
+      showInfo(this.state, 'Telegram is temporarily unavailable. The terminal session is still active.');
+    }
+  }
+
+  private async handleTelegramCommand(command: 'status' | 'stop' | 'help'): Promise<void> {
+    if (command === 'help') {
+      await this.sendTelegramControlMessage(formatTelegramHelp());
+      return;
+    }
+
+    if (command === 'stop') {
+      const display = this.state.session.displayState.get();
+      const wasActive =
+        this.state.session.run.isRunning() || display.pendingApproval !== null || display.pendingSuspensions.size > 0;
+      for (const [messageId, pending] of this.state.pendingSignalMessageComponentsById) {
+        if (pending.label === 'Telegram') removePendingUserMessage(this.state, messageId);
+      }
+      if (wasActive) {
+        this.state.userInitiatedAbort = true;
+        this.state.pendingApprovalDismiss?.({ reason: 'telegram_stop', message: 'Stopped from Telegram.' });
+        this.state.session.abort();
+      }
+      await this.sendTelegramControlMessage(
+        wasActive ? 'Stopping active MastraCode work.' : 'MastraCode is already idle.',
+      );
+      return;
+    }
+
+    const display = this.state.session.displayState.get();
+    const pendingTool =
+      display.pendingApproval?.toolName ??
+      display.pendingSuspensions.values().next().value?.toolName ??
+      display.activeTools.values().next().value?.name;
+    const activeTask = display.tasks.find(task => task.status === 'in_progress');
+    const isSuspended = display.pendingApproval !== null || display.pendingSuspensions.size > 0;
+    const isRunning = this.state.session.run.isRunning();
+    const runState = this.state.userInitiatedAbort
+      ? 'stopping'
+      : isSuspended
+        ? 'suspended'
+        : isRunning
+          ? 'running'
+          : 'idle';
+    const activeForMs =
+      isRunning && this.state.agentRunStartedAt ? Date.now() - this.state.agentRunStartedAt : undefined;
+
+    await this.sendTelegramControlMessage(
+      formatTelegramStatus({
+        project: this.state.projectInfo.name,
+        thread: formatThreadReference(this.state.currentThreadTitle, this.state.session.thread.getId() ?? ''),
+        model: this.state.session.model.get() ?? 'not selected',
+        mode: this.state.session.mode.get() ?? 'unknown',
+        runState,
+        currentWork: pendingTool ? `tool: ${pendingTool}` : activeTask ? 'task in progress' : 'none',
+        queuedFollowUps: this.state.pendingQueuedActions.length + this.state.session.followUps.count(),
+        activeForMs,
+        telegramHealth: this.state.options?.messageBridge?.health() ?? 'disconnected',
+      }),
+    );
+  }
+
   private async receiveExternalMessage(text: string): Promise<void> {
-    const content = text.trim();
+    const input = parseTelegramCommand(text);
+    if (input.type === 'command') {
+      await this.handleTelegramCommand(input.command);
+      return;
+    }
+    if (input.type === 'unsupported') {
+      await this.sendTelegramControlMessage(formatUnsupportedTelegramCommand(input.command));
+      return;
+    }
+
+    const content = input.text;
     if (!content) return;
 
     if (this.state.session.run.isRunning()) {
@@ -852,6 +944,11 @@ export class MastraTUI {
         await this.syncThreadActivePackMetadata(event.thread);
       } else if (event.type === 'thread_changed') {
         await this.syncThreadActivePackMetadata();
+        if (this.state.options.messageBridge) {
+          void this.sendTelegramControlMessage(
+            formatThreadNotice('Now following thread', this.state.currentThreadTitle, event.threadId),
+          );
+        }
       }
 
       if (event.type === 'agent_start' && this.state.agentRunStartedAt !== undefined) {

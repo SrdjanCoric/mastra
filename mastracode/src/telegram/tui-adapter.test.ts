@@ -26,12 +26,15 @@ describe('createTelegramTuiBridge', () => {
     });
     const onMessage = vi.fn().mockResolvedValue(undefined);
 
+    expect(bridge.health()).toBe('disconnected');
     await bridge.start(onMessage);
+    expect(bridge.health()).toBe('connected');
     const registration = mocks.connectToTelegramBroker.mock.calls[0]?.[0];
     registration.onMessage('from Telegram');
     await vi.waitFor(() => expect(onMessage).toHaveBeenCalledWith('from Telegram'));
     await bridge.sendMessage('from MastraCode');
     bridge.stop();
+    expect(bridge.health()).toBe('disconnected');
 
     expect(registration).toMatchObject({
       homeDir: '/tmp/home',

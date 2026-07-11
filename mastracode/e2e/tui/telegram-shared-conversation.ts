@@ -22,6 +22,9 @@ export const telegramSharedConversationScenario: McE2eScenario = {
           async sendMessage(text) {
             telegramOutput.push(text);
           },
+          health() {
+            return 'connected';
+          },
           stop() {},
         },
       },
@@ -36,14 +39,24 @@ export const telegramSharedConversationScenario: McE2eScenario = {
     }
     if (!deliverTelegramMessage) throw new Error('Telegram TUI bridge did not start.');
 
+    await deliverTelegramMessage('/help');
+    await deliverTelegramMessage('/status');
+    expect(telegramOutput.join('\n')).toContain('Following thread:');
+    expect(telegramOutput.join('\n')).toContain('/status - show safe session status');
+    expect(telegramOutput.join('\n')).toContain('MastraCode status');
+    expect(telegramOutput.join('\n')).toContain('Telegram: connected');
+
     await deliverTelegramMessage('Reply to the Telegram e2e message.');
     await runtime.waitForScreenText(/Telegram shared conversation response/i, terminal, 30_000);
     await runtime.waitForScreenText(/Telegram/i, terminal);
 
-    for (let attempt = 0; attempt < 50 && telegramOutput.length === 0; attempt += 1) {
+    for (
+      let attempt = 0;
+      attempt < 50 && !telegramOutput.includes('Telegram shared conversation response');
+      attempt += 1
+    ) {
       await runtime.sleep(10);
     }
-    expect(telegramOutput).toHaveLength(1);
     expect(telegramOutput).toContain('Telegram shared conversation response');
 
     terminal.keyCtrlC();
