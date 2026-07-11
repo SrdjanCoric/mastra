@@ -24,18 +24,20 @@ describe('handleToolApprovalRequired Telegram resolution', () => {
         },
       },
     }) as unknown as TUIState;
-    const bridge = new InteractivePromptBridge({ sendMessage, idFactory: () => 'ABC123' });
+    const sendPrompt = vi.fn(async (_prompt: { summary: string }) => ({ messageId: 101 }));
+    const bridge = new InteractivePromptBridge({ sendMessage, sendPrompt, idFactory: () => 'ABC123' });
     state.interactivePromptBridge = bridge;
     const ctx = { state, notify: vi.fn() } as unknown as EventHandlerContext;
 
     handleToolApprovalRequired(ctx, 'tool-telegram', 'execute_command', { command: 'echo super-secret' });
-    await bridge.receiveMessage('ABC123 approve');
+    await Promise.resolve();
+    await bridge.receiveMessage({ text: 'approve', replyToMessageId: 101 });
 
     expect(respondToToolApproval).toHaveBeenCalledWith({
       decision: 'approve',
       toolCallId: 'tool-telegram',
     });
-    expect(sendMessage.mock.calls[0]?.[0]).toContain('Arguments are available only in the terminal.');
-    expect(sendMessage.mock.calls[0]?.[0]).not.toContain('super-secret');
+    expect(sendPrompt.mock.calls[0]?.[0].summary).toContain('Arguments are available only in the terminal.');
+    expect(sendPrompt.mock.calls[0]?.[0].summary).not.toContain('super-secret');
   });
 });

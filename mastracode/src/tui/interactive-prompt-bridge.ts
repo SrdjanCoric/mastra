@@ -27,27 +27,50 @@ export interface InteractivePromptOptions {
 
 interface PendingPrompt extends InteractivePromptOptions {
   id: string;
+  telegramMessageId?: number;
+}
+
+export interface InteractivePromptTelegramMessage {
+  text: string;
+  replyToMessageId?: number;
+  promptId?: string;
 }
 
 const approvalWords = new Set(['approve', 'approved', 'confirm', 'confirmed', 'yes', 'y', 'ok', 'go', 'ship it']);
 const denialWords = new Set(['deny', 'denied', 'reject', 'rejected', 'no', 'n', 'stop']);
-const promptReplyPattern = /^([A-Z0-9]{6})\s+([\s\S]+)$/i;
 
 export class InteractivePromptBridge {
   readonly #pending = new Map<string, PendingPrompt>();
   readonly #resolved = new Set<string>();
+  readonly #resolvedTelegramMessageIds = new Set<number>();
   readonly #sendMessage: (text: string) => Promise<void>;
+  readonly #sendPrompt: (
+    prompt: Pick<InteractivePromptOptions, 'kind' | 'title' | 'summary'> & { promptId: string },
+  ) => Promise<{ messageId: number }>;
   readonly #idFactory: () => string;
 
-  constructor(options: { sendMessage(text: string): Promise<void>; idFactory?: () => string }) {
+  constructor(options: {
+    sendMessage(text: string): Promise<void>;
+    sendPrompt(
+      prompt: Pick<InteractivePromptOptions, 'kind' | 'title' | 'summary'> & { promptId: string },
+    ): Promise<{ messageId: number }>;
+    idFactory?: () => string;
+  }) {
     this.#sendMessage = options.sendMessage;
+    this.#sendPrompt = options.sendPrompt;
     this.#idFactory = options.idFactory ?? (() => randomBytes(3).toString('hex').toUpperCase());
   }
 
   present(options: InteractivePromptOptions): InteractivePromptHandle {
     const id = this.#nextId();
-    this.#pending.set(id, { ...options, id });
-    void this.#sendMessage(formatPrompt(id, options)).catch(() => {});
+    const pending: PendingPrompt = { ...options, id };
+    this.#pending.set(id, pending);
+    void this.#sendPrompt({ promptId: id, kind: options.kind, title: options.title, summary: options.summary })
+      .then(({ messageId }) => {
+        pending.telegramMessageId = messageId;
+        if (this.#resolved.has(id)) this.#resolvedTelegramMessageIds.add(messageId);
+      })
+      .catch(() => {});
 
     return {
       id,
@@ -55,42 +78,29 @@ export class InteractivePromptBridge {
     };
   }
 
-  async receiveMessage(text: string): Promise<boolean> {
-    const trimmed = text.trim();
-    const match = promptReplyPattern.exec(trimmed);
-
-    if (!match) {
-      const pending = this.#pending.values().next().value as PendingPrompt | undefined;
-      if (!pending) return false;
-      await this.#sendMessage(replyGuidance(pending)).catch(() => {});
+  async receiveMessage(message: InteractivePromptTelegramMessage): Promise<boolean> {
+    const promptId = message.promptId?.toUpperCase();
+    const pending = promptId
+      ? this.#pending.get(promptId)
+      : [...this.#pending.values()].find(prompt => prompt.telegramMessageId === message.replyToMessageId);
+    if (!pending) {
+      const wasResolved =
+        (promptId !== undefined && this.#resolved.has(promptId)) ||
+        (message.replyToMessageId !== undefined && this.#resolvedTelegramMessageIds.has(message.replyToMessageId));
+      if (!wasResolved) return false;
+      await this.#sendMessage('That prompt was already resolved. This delayed or duplicate reply was ignored.').catch(
+        () => {},
+      );
       return true;
     }
 
-    const id = match[1]!.toUpperCase();
-    const replyText = match[2]!.trim();
-    const pending = this.#pending.get(id);
-    if (!pending) {
-      if (this.#resolved.has(id)) {
-        await this.#sendMessage(
-          `Prompt ${id} was already resolved. This delayed or duplicate reply was ignored.`,
-        ).catch(() => {});
-        return true;
-      }
-      if (this.#pending.size > 0) {
-        const active = this.#pending.values().next().value as PendingPrompt;
-        await this.#sendMessage(`Prompt ${id} is not active. ${replyGuidance(active)}`).catch(() => {});
-        return true;
-      }
-      return false;
-    }
-
-    const response = parseResponse(pending.kind, replyText);
+    const response = parseResponse(pending.kind, message.text.trim());
     if (!response) {
       await this.#sendMessage(replyGuidance(pending)).catch(() => {});
       return true;
     }
 
-    this.#claim(id, response, 'telegram');
+    this.#claim(pending.id, response, 'telegram');
     return true;
   }
 
@@ -99,6 +109,7 @@ export class InteractivePromptBridge {
     this.#pending.clear();
     for (const prompt of pending) {
       this.#resolved.add(prompt.id);
+      if (prompt.telegramMessageId !== undefined) this.#resolvedTelegramMessageIds.add(prompt.telegramMessageId);
       await prompt.onCancel?.(reason);
     }
   }
@@ -109,15 +120,16 @@ export class InteractivePromptBridge {
 
     this.#pending.delete(id);
     this.#resolved.add(id);
+    if (pending.telegramMessageId !== undefined) this.#resolvedTelegramMessageIds.add(pending.telegramMessageId);
     void Promise.resolve(pending.onResolve(response, source))
       .then(() =>
         this.#sendMessage(
           source === 'telegram'
-            ? `Prompt ${id} was resolved from Telegram.`
-            : `Prompt ${id} was resolved in the terminal. Later Telegram replies will be ignored.`,
+            ? 'The prompt was resolved from Telegram.'
+            : 'The prompt was resolved in the terminal. Later Telegram replies will be ignored.',
         ),
       )
-      .catch(() => this.#sendMessage(`Prompt ${id} could not be applied safely. The reply was not retried.`))
+      .catch(() => this.#sendMessage('The prompt could not be applied safely. The reply was not retried.'))
       .catch(() => {});
     return true;
   }
@@ -139,16 +151,8 @@ function parseResponse(kind: InteractivePromptOptions['kind'], text: string): In
   return undefined;
 }
 
-function formatPrompt(id: string, prompt: InteractivePromptOptions): string {
-  const instruction =
-    prompt.kind === 'approval'
-      ? `Reply \`${id} approve\` or \`${id} deny\`.`
-      : `Reply \`${id} <answer>\`. The prompt ID is required.`;
-  return [`${prompt.title} (${id})`, prompt.summary, instruction].join('\n');
-}
-
 function replyGuidance(prompt: PendingPrompt): string {
   return prompt.kind === 'approval'
-    ? `Reply \`${prompt.id} approve\` or \`${prompt.id} deny\`. Ambiguous text cannot approve work.`
-    : `Reply \`${prompt.id} <answer>\` so the answer is bound to the current question.`;
+    ? 'Reply directly to the approval prompt with `approve` or `deny`. Ambiguous text cannot approve work.'
+    : 'Reply directly to the question prompt so Telegram can bind the answer automatically.';
 }

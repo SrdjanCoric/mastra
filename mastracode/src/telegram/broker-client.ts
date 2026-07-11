@@ -2,10 +2,17 @@ import { randomUUID } from 'node:crypto';
 import net from 'node:net';
 import { TELEGRAM_BROKER_PROTOCOL_VERSION, createBrokerMessageParser, encodeBrokerMessage } from './broker-protocol.js';
 import type { TelegramBrokerClientMessage, TelegramBrokerServerMessage } from './broker-protocol.js';
-import type { TelegramProjectRegistration } from './broker.js';
+import type { TelegramProjectRegistration, TelegramPrompt } from './broker.js';
+
+export interface TelegramBrokerIncomingMessage {
+  text: string;
+  replyToMessageId?: number;
+  promptId?: string;
+}
 
 export interface TelegramBrokerClient {
   sendMessage(text: string): Promise<void>;
+  sendPrompt(prompt: TelegramPrompt): Promise<{ messageId: number }>;
   close(): void;
 }
 
@@ -38,7 +45,7 @@ export async function verifyTelegramRoundTripThroughBroker(options: {
 export async function connectTelegramBrokerClient(options: {
   socketPath: string;
   registration: TelegramProjectRegistration;
-  onMessage(text: string): void;
+  onMessage(message: TelegramBrokerIncomingMessage): void;
   onError?(error: Error): void;
 }): Promise<TelegramBrokerClient> {
   const socket = net.createConnection(options.socketPath);
@@ -48,7 +55,10 @@ export async function connectTelegramBrokerClient(options: {
     resolveRegistered = resolve;
     rejectRegistered = reject;
   });
-  const pendingSends = new Map<string, { resolve: () => void; reject: (error: Error) => void }>();
+  const pendingSends = new Map<
+    string,
+    { resolve: (messageId: number | undefined) => void; reject: (error: Error) => void }
+  >();
 
   socket.on(
     'data',
@@ -62,9 +72,13 @@ export async function connectTelegramBrokerClient(options: {
       if (message.type === 'registered') {
         resolveRegistered();
       } else if (message.type === 'message') {
-        options.onMessage(message.text);
+        options.onMessage({
+          text: message.text,
+          ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
+          ...(message.promptId === undefined ? {} : { promptId: message.promptId }),
+        });
       } else if (message.type === 'sent') {
-        pendingSends.get(message.requestId)?.resolve();
+        pendingSends.get(message.requestId)?.resolve(message.messageId);
         pendingSends.delete(message.requestId);
       } else if (message.type === 'verified') {
         return;
@@ -100,18 +114,24 @@ export async function connectTelegramBrokerClient(options: {
 
   await registered;
 
+  const sendRequest = (message: TelegramBrokerClientMessage & { requestId: string }): Promise<number | undefined> =>
+    new Promise((resolve, reject) => {
+      pendingSends.set(message.requestId, { resolve, reject });
+      socket.write(encodeBrokerMessage(message), error => {
+        if (!error) return;
+        pendingSends.delete(message.requestId);
+        reject(error);
+      });
+    });
+
   return {
     sendMessage: async text => {
-      await new Promise<void>((resolve, reject) => {
-        const requestId = randomUUID();
-        pendingSends.set(requestId, { resolve, reject });
-        const message: TelegramBrokerClientMessage = { version: 1, type: 'send', requestId, text };
-        socket.write(encodeBrokerMessage(message), error => {
-          if (!error) return;
-          pendingSends.delete(requestId);
-          reject(error);
-        });
-      });
+      await sendRequest({ version: 1, type: 'send', requestId: randomUUID(), text });
+    },
+    sendPrompt: async prompt => {
+      const messageId = await sendRequest({ version: 1, type: 'send_prompt', requestId: randomUUID(), prompt });
+      if (messageId === undefined) throw new Error('Telegram broker did not return the prompt message ID.');
+      return { messageId };
     },
     close: () => socket.end(),
   };

@@ -143,13 +143,13 @@ describe('MastraTUI queueing', () => {
     };
     const tui = Object.create(MastraTUI.prototype) as {
       state: typeof state;
-      receiveExternalMessage: (text: string) => Promise<void>;
+      receiveExternalMessage: (message: { text: string; replyToMessageId?: number }) => Promise<void>;
       signalMessage: (text: string, images?: undefined, options?: { label?: string }) => void;
     };
     tui.state = state;
     tui.signalMessage = vi.fn();
 
-    await tui.receiveExternalMessage('continue from Telegram');
+    await tui.receiveExternalMessage({ text: 'continue from Telegram' });
 
     expect(tui.signalMessage).toHaveBeenCalledWith('continue from Telegram', undefined, { label: 'Telegram' });
   });
@@ -162,12 +162,12 @@ describe('MastraTUI queueing', () => {
     };
     const tui = Object.create(MastraTUI.prototype) as {
       state: typeof state;
-      receiveExternalMessage: (text: string) => Promise<void>;
+      receiveExternalMessage: (message: { text: string; replyToMessageId?: number }) => Promise<void>;
     };
     tui.state = state;
 
-    await tui.receiveExternalMessage('/help');
-    await tui.receiveExternalMessage('/models');
+    await tui.receiveExternalMessage({ text: '/help' });
+    await tui.receiveExternalMessage({ text: '/models' });
 
     expect(sendMessage).toHaveBeenCalledTimes(2);
     expect(sendMessage.mock.calls[0]?.[0]).toContain('/status');
@@ -202,11 +202,11 @@ describe('MastraTUI queueing', () => {
     };
     const tui = Object.create(MastraTUI.prototype) as {
       state: typeof state;
-      receiveExternalMessage: (text: string) => Promise<void>;
+      receiveExternalMessage: (message: { text: string; replyToMessageId?: number }) => Promise<void>;
     };
     tui.state = state;
 
-    await tui.receiveExternalMessage('/status');
+    await tui.receiveExternalMessage({ text: '/status' });
 
     const output = sendMessage.mock.calls[0]?.[0] as string;
     expect(output).toContain('Current: tool: execute_command');
@@ -239,11 +239,11 @@ describe('MastraTUI queueing', () => {
     };
     const tui = Object.create(MastraTUI.prototype) as {
       state: typeof state;
-      receiveExternalMessage: (text: string) => Promise<void>;
+      receiveExternalMessage: (message: { text: string; replyToMessageId?: number }) => Promise<void>;
     };
     tui.state = state;
 
-    await tui.receiveExternalMessage('/stop');
+    await tui.receiveExternalMessage({ text: '/stop' });
 
     expect(abort).toHaveBeenCalledTimes(1);
     expect(pendingApprovalDismiss).toHaveBeenCalledWith({ reason: 'telegram_stop', message: 'Stopped from Telegram.' });
@@ -281,11 +281,11 @@ describe('MastraTUI queueing', () => {
       };
       const tui = Object.create(MastraTUI.prototype) as {
         state: typeof state;
-        receiveExternalMessage: (text: string) => Promise<void>;
+        receiveExternalMessage: (message: { text: string; replyToMessageId?: number }) => Promise<void>;
       };
       tui.state = state;
 
-      await tui.receiveExternalMessage('/stop');
+      await tui.receiveExternalMessage({ text: '/stop' });
 
       expect(abort).toHaveBeenCalledTimes(shouldAbort ? 1 : 0);
       expect(sendMessage).toHaveBeenCalledWith(reply);
@@ -304,7 +304,7 @@ describe('MastraTUI queueing', () => {
     };
     const tui = Object.create(MastraTUI.prototype) as {
       state: typeof state;
-      receiveExternalMessage: (text: string) => Promise<void>;
+      receiveExternalMessage: (message: { text: string; replyToMessageId?: number }) => Promise<void>;
       runUserPromptHook: (text: string) => Promise<boolean>;
       fireMessage: (text: string) => void;
     };
@@ -312,7 +312,7 @@ describe('MastraTUI queueing', () => {
     tui.runUserPromptHook = vi.fn().mockResolvedValue(true);
     tui.fireMessage = vi.fn();
 
-    await tui.receiveExternalMessage('start from Telegram');
+    await tui.receiveExternalMessage({ text: 'start from Telegram' });
 
     expect(mocks.addUserMessage).toHaveBeenCalledWith(
       state,

@@ -71,9 +71,10 @@ function createCtx() {
 
 function attachInteractivePromptBridge(state: TUIState, id = 'ABC123') {
   const sendMessage = vi.fn(async (_text: string) => {});
-  const bridge = new InteractivePromptBridge({ sendMessage, idFactory: () => id });
+  const sendPrompt = vi.fn(async (_prompt: { summary: string }) => ({ messageId: 101 }));
+  const bridge = new InteractivePromptBridge({ sendMessage, sendPrompt, idFactory: () => id });
   state.interactivePromptBridge = bridge;
-  return { bridge, sendMessage };
+  return { bridge, sendMessage, sendPrompt };
 }
 
 describe('handleSandboxAccessRequest', () => {
@@ -94,7 +95,7 @@ describe('handleSandboxAccessRequest', () => {
 
   it('resolves an authorized Telegram approval through the native suspension API', async () => {
     const { ctx, state } = createCtx();
-    const { bridge, sendMessage } = attachInteractivePromptBridge(state);
+    const { bridge, sendPrompt } = attachInteractivePromptBridge(state);
 
     const promise = handleSandboxAccessRequest(
       ctx,
@@ -102,15 +103,16 @@ describe('handleSandboxAccessRequest', () => {
       `${process.env.HOME}/private/project`,
       'Read files with token=top-secret',
     );
-    await bridge.receiveMessage('ABC123 approve');
+    await Promise.resolve();
+    await bridge.receiveMessage({ text: 'approve', replyToMessageId: 101 });
     await promise;
 
     expect(state.session.respondToToolSuspension).toHaveBeenCalledWith({
       toolCallId: 'sandbox-telegram',
       resumeData: 'Yes',
     });
-    expect(sendMessage.mock.calls[0]?.[0]).toContain('Path: ~/private/project');
-    expect(sendMessage.mock.calls[0]?.[0]).not.toContain('top-secret');
+    expect(sendPrompt.mock.calls[0]?.[0].summary).toContain('Path: ~/private/project');
+    expect(sendPrompt.mock.calls[0]?.[0].summary).not.toContain('top-secret');
   });
 });
 
@@ -159,7 +161,8 @@ describe('handleAskQuestion goal mode', () => {
 
     const promise = handleAskQuestion(ctx, 'q-telegram', 'Which branch?');
     const component = state.activeInlineQuestion!;
-    await bridge.receiveMessage('ABC123 feature/telegram');
+    await Promise.resolve();
+    await bridge.receiveMessage({ text: 'feature/telegram', replyToMessageId: 101 });
     component.handleInput('ignored\r');
     await promise;
 

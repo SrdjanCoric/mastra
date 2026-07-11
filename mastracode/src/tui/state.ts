@@ -94,9 +94,23 @@ export function getGithubPrSubscriptionsFromMetadata(
 // MastraTUIOptions
 // =============================================================================
 
+export interface TUIBridgeIncomingMessage {
+  text: string;
+  replyToMessageId?: number;
+  promptId?: string;
+}
+
+export interface TUIBridgePrompt {
+  promptId: string;
+  kind: 'approval' | 'question';
+  title: string;
+  summary: string;
+}
+
 export interface TUIMessageBridge {
-  start(onMessage: (text: string) => Promise<void>): Promise<void>;
+  start(onMessage: (message: TUIBridgeIncomingMessage) => Promise<void>): Promise<void>;
   sendMessage(text: string): Promise<void>;
+  sendPrompt(prompt: TUIBridgePrompt): Promise<{ messageId: number }>;
   health(): 'connected' | 'disconnected';
   stop(): void;
 }

@@ -60,7 +60,13 @@ export async function startTelegramBrokerServer(options: {
         }
         try {
           options.broker.register(clientId, message.registration, delivery => {
-            send({ version: 1, type: 'message', text: delivery.text });
+            send({
+              version: 1,
+              type: 'message',
+              text: delivery.text,
+              ...(delivery.replyToMessageId === undefined ? {} : { replyToMessageId: delivery.replyToMessageId }),
+              ...(delivery.promptId === undefined ? {} : { promptId: delivery.promptId }),
+            });
           });
           registered = true;
           send({ version: 1, type: 'registered' });
@@ -90,6 +96,20 @@ export async function startTelegramBrokerServer(options: {
       }
       if (!registered) {
         send({ version: 1, type: 'error', message: 'Register the Telegram project before sending messages.' });
+        return;
+      }
+      if (message.type === 'send_prompt') {
+        void options.broker.sendProjectPrompt(clientId, message.prompt).then(
+          result => send({ version: 1, type: 'sent', requestId: message.requestId, messageId: result.messageId }),
+          error => {
+            send({
+              version: 1,
+              type: 'error',
+              requestId: message.requestId,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          },
+        );
         return;
       }
       void options.broker.sendProjectMessage(clientId, message.text).then(
@@ -153,6 +173,16 @@ function isTelegramBrokerClientMessage(message: unknown): message is TelegramBro
   }
   if (message.type === 'send') {
     return typeof message.requestId === 'string' && typeof message.text === 'string';
+  }
+  if (message.type === 'send_prompt') {
+    return (
+      typeof message.requestId === 'string' &&
+      isRecord(message.prompt) &&
+      typeof message.prompt.promptId === 'string' &&
+      (message.prompt.kind === 'approval' || message.prompt.kind === 'question') &&
+      typeof message.prompt.title === 'string' &&
+      typeof message.prompt.summary === 'string'
+    );
   }
   if (message.type === 'verify') {
     return typeof message.requestId === 'string' && Number.isSafeInteger(message.threadId);

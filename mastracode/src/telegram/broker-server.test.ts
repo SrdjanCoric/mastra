@@ -29,7 +29,11 @@ async function waitFor(check: () => boolean): Promise<void> {
 describe('Telegram broker socket', () => {
   it('rejects malformed IPC without crashing the broker', async () => {
     const socketPath = await createSocketPath();
-    const telegram = { getTextUpdates: vi.fn(async () => []), sendMessage: vi.fn(async () => {}) };
+    const telegram = {
+      getTextUpdates: vi.fn(async () => []),
+      sendMessage: vi.fn(async () => {}),
+      sendPrompt: vi.fn(async () => ({ messageId: 1 })),
+    };
     const broker = new TelegramBroker({ allowedUserId: 42, telegram });
     const server = await startTelegramBrokerServer({ socketPath, broker, shutdownGraceMs: 5 });
     const response = await new Promise<string>((resolve, reject) => {
@@ -47,6 +51,7 @@ describe('Telegram broker socket', () => {
     const telegram = {
       getTextUpdates: vi.fn(async () => []),
       sendMessage: vi.fn<(threadId: number, text: string) => Promise<void>>(async () => {}),
+      sendPrompt: vi.fn(async () => ({ messageId: 1 })),
     };
     const broker = new TelegramBroker({ allowedUserId: 42, telegram });
     const server = await startTelegramBrokerServer({ socketPath, broker, shutdownGraceMs: 5 });
@@ -62,7 +67,11 @@ describe('Telegram broker socket', () => {
 
   it('shares one broker across project clients and exits after the last disconnect', async () => {
     const socketPath = await createSocketPath();
-    const telegram = { getTextUpdates: vi.fn(async () => []), sendMessage: vi.fn(async () => {}) };
+    const telegram = {
+      getTextUpdates: vi.fn(async () => []),
+      sendMessage: vi.fn(async () => {}),
+      sendPrompt: vi.fn(async () => ({ messageId: 1 })),
+    };
     const broker = new TelegramBroker({ allowedUserId: 42, telegram });
     const server = await startTelegramBrokerServer({ socketPath, broker, shutdownGraceMs: 15 });
     const oneMessages: string[] = [];
@@ -70,12 +79,12 @@ describe('Telegram broker socket', () => {
     const one = await connectTelegramBrokerClient({
       socketPath,
       registration: { projectPath: '/projects/one', threadId: 101 },
-      onMessage: text => oneMessages.push(text),
+      onMessage: message => oneMessages.push(message.text),
     });
     const two = await connectTelegramBrokerClient({
       socketPath,
       registration: { projectPath: '/projects/two', threadId: 202 },
-      onMessage: text => twoMessages.push(text),
+      onMessage: message => twoMessages.push(message.text),
     });
 
     await broker.processUpdate({ updateId: 1, userId: 42, threadId: 202, text: 'hello two' });
@@ -85,6 +94,16 @@ describe('Telegram broker socket', () => {
 
     await one.sendMessage('one reply');
     expect(telegram.sendMessage).toHaveBeenCalledWith(101, 'one reply');
+
+    await expect(
+      two.sendPrompt({ promptId: 'ABC123', kind: 'question', title: 'Question', summary: 'Which branch?' }),
+    ).resolves.toEqual({ messageId: 1 });
+    expect(telegram.sendPrompt).toHaveBeenCalledWith(202, {
+      promptId: 'ABC123',
+      kind: 'question',
+      title: 'Question',
+      summary: 'Which branch?',
+    });
 
     one.close();
     await new Promise(resolve => setTimeout(resolve, 25));

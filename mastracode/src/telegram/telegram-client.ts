@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import type { TelegramTextUpdate } from './broker.js';
+import type { TelegramPrompt, TelegramTextUpdate } from './broker.js';
 import type { TelegramRuntimeConfig } from './setup.js';
 
 export interface TelegramProjectClient {
   validateAuthorization(): Promise<void>;
   createForumTopic(name: string): Promise<{ threadId: number }>;
   sendMessage(threadId: number, text: string): Promise<void>;
+  sendPrompt?(threadId: number, prompt: TelegramPrompt): Promise<{ messageId: number }>;
   verifyRoundTrip(threadId: number): Promise<void>;
 }
 
@@ -18,13 +19,23 @@ interface TelegramResponse<T> {
   parameters?: { migrate_to_chat_id?: number };
 }
 
+interface TelegramMessage {
+  message_id?: number;
+  message_thread_id?: number;
+  text?: string;
+  chat?: { id?: number };
+  from?: { id?: number };
+  reply_to_message?: { message_id?: number };
+}
+
 interface TelegramUpdate {
   update_id: number;
-  message?: {
-    message_thread_id?: number;
-    text?: string;
-    chat?: { id?: number };
+  message?: TelegramMessage;
+  callback_query?: {
+    id?: string;
+    data?: string;
     from?: { id?: number };
+    message?: TelegramMessage;
   };
 }
 
@@ -99,32 +110,82 @@ export class TelegramBotClient implements TelegramProjectClient {
     }
   }
 
+  async sendPrompt(threadId: number, prompt: TelegramPrompt): Promise<{ messageId: number }> {
+    const instruction =
+      prompt.kind === 'approval' ? 'Choose an action below.' : 'Type your answer in the reply field below.';
+    const replyMarkup =
+      prompt.kind === 'approval'
+        ? {
+            inline_keyboard: [
+              [
+                { text: 'Approve', callback_data: `mastracode:${prompt.promptId}:approve` },
+                { text: 'Deny', callback_data: `mastracode:${prompt.promptId}:deny` },
+              ],
+            ],
+          }
+        : { force_reply: true, selective: true };
+    const response = await this.request<{ message_id?: number }>('sendMessage', {
+      chat_id: this.config.groupId,
+      message_thread_id: threadId,
+      text: `${prompt.title}\n${prompt.summary}\n${instruction}`,
+      reply_markup: replyMarkup,
+    });
+    const messageId = response.result?.message_id;
+    if (messageId === undefined) throw new Error('Telegram did not return the prompt message ID.');
+    return { messageId };
+  }
+
   async getTextUpdates(offset: number | undefined, signal?: AbortSignal): Promise<TelegramTextUpdate[]> {
     const response = await this.request<TelegramUpdate[]>(
       'getUpdates',
       {
         ...(offset === undefined ? {} : { offset }),
         timeout: 25,
-        allowed_updates: JSON.stringify(['message']),
+        allowed_updates: JSON.stringify(['message', 'callback_query']),
       },
       signal,
     );
 
-    return (response.result ?? []).map(update => {
+    const updates: TelegramTextUpdate[] = [];
+    for (const update of response.result ?? []) {
+      const callback = update.callback_query;
+      const callbackMatch = callback?.data?.match(/^mastracode:([A-F0-9]{6}):(approve|deny)$/);
+      if (callback && callbackMatch) {
+        if (callback.id) await this.request('answerCallbackQuery', { callback_query_id: callback.id });
+        const message = callback.message;
+        const routable =
+          message?.chat?.id === this.config.groupId &&
+          callback.from?.id !== undefined &&
+          message.message_thread_id !== undefined;
+        updates.push({
+          updateId: update.update_id,
+          userId: callback.from?.id ?? 0,
+          threadId: message?.message_thread_id ?? 0,
+          text: callbackMatch[2] ?? '',
+          promptId: callbackMatch[1],
+          ...(routable ? {} : { routable: false }),
+        });
+        continue;
+      }
+
       const message = update.message;
       const routable =
         message?.chat?.id === this.config.groupId &&
         message.from?.id !== undefined &&
         message.message_thread_id !== undefined &&
         message.text !== undefined;
-      return {
+      updates.push({
         updateId: update.update_id,
         userId: message?.from?.id ?? 0,
         threadId: message?.message_thread_id ?? 0,
         text: message?.text ?? '',
+        ...(message?.reply_to_message?.message_id === undefined
+          ? {}
+          : { replyToMessageId: message.reply_to_message.message_id }),
         ...(routable ? {} : { routable: false }),
-      };
-    });
+      });
+    }
+    return updates;
   }
 
   async verifyRoundTrip(threadId: number): Promise<void> {
@@ -176,7 +237,7 @@ export class TelegramBotClient implements TelegramProjectClient {
 
   private async request<T = unknown>(
     method: string,
-    body: Record<string, string | number>,
+    body: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<TelegramResponse<T>> {
     const response = await this.telegramFetch(`https://api.telegram.org/bot${this.config.botToken}/${method}`, {

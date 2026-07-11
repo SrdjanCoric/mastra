@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import { connectTelegramBrokerClient } from './broker-client.js';
-import type { TelegramBrokerClient } from './broker-client.js';
+import type { TelegramBrokerClient, TelegramBrokerIncomingMessage } from './broker-client.js';
 import type { TelegramProjectRegistration } from './broker.js';
 import { resolveTelegramBrokerPaths, resolveTelegramRuntimePaths } from './runtime-paths.js';
 import { loadTelegramRuntimeConfig } from './setup.js';
@@ -9,7 +9,7 @@ import { loadTelegramRuntimeConfig } from './setup.js';
 export async function connectToTelegramBroker(options: {
   homeDir: string;
   registration: TelegramProjectRegistration;
-  onMessage(text: string): void;
+  onMessage(message: TelegramBrokerIncomingMessage): void;
   onError?(error: Error): void;
   executablePath?: string;
 }): Promise<TelegramBrokerClient> {

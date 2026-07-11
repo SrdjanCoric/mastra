@@ -84,7 +84,7 @@ import {
   renderExistingTasks,
 } from './setup.js';
 import { handleShellPassthrough } from './shell.js';
-import type { MastraTUIOptions, TUIState } from './state.js';
+import type { MastraTUIOptions, TUIBridgeIncomingMessage, TUIState } from './state.js';
 import { createTUIState, getGithubPrSubscriptionsFromMetadata } from './state.js';
 import { updateStatusLine } from './status-line.js';
 
@@ -177,6 +177,7 @@ export class MastraTUI {
     if (options.messageBridge) {
       this.state.interactivePromptBridge = new InteractivePromptBridge({
         sendMessage: text => options.messageBridge!.sendMessage(text),
+        sendPrompt: prompt => options.messageBridge!.sendPrompt(prompt),
       });
     }
 
@@ -617,8 +618,10 @@ export class MastraTUI {
     );
   }
 
-  private async receiveExternalMessage(text: string): Promise<void> {
-    const input = parseTelegramCommand(text);
+  private async receiveExternalMessage(message: TUIBridgeIncomingMessage): Promise<void> {
+    if (await this.state.interactivePromptBridge?.receiveMessage(message)) return;
+
+    const input = parseTelegramCommand(message.text);
     if (input.type === 'command') {
       await this.handleTelegramCommand(input.command);
       return;
@@ -630,8 +633,6 @@ export class MastraTUI {
 
     const content = input.text;
     if (!content) return;
-
-    if (await this.state.interactivePromptBridge?.receiveMessage(content)) return;
 
     if (this.state.session.run.isRunning()) {
       this.signalMessage(content, undefined, { label: 'Telegram' });

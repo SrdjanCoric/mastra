@@ -20,7 +20,7 @@ Adapt `mastracode-remote`'s `telegram-wait-bridge` reply parsing, allowed-user/t
 
 ## Human-in-the-loop tasks
 
-- [ ] [confirm-security] Confirm the authorization checks, prompt identity binding, approval/denial semantics, redaction, and stale-reply protections before merge.
+- [x] [confirm-security] Confirm the authorization checks, prompt identity binding, approval/denial semantics, redaction, and stale-reply protections before merge.
 
 ## Acceptance criteria
 
@@ -33,8 +33,9 @@ Adapt `mastracode-remote`'s `telegram-wait-bridge` reply parsing, allowed-user/t
 
 ## Implementation log
 
-- Added a prompt coordinator with six-character identities, exact approval/denial parsing, first-response-wins claims, stale/duplicate guidance, and cancellation on stop, shutdown, or thread change.
+- Added a prompt coordinator with internal six-character identities, first-response-wins claims, stale/duplicate guidance, and cancellation on stop, shutdown, or thread change. Users never type or see those identities: Telegram questions use native forced replies and approvals use Approve/Deny buttons whose callback metadata carries the identity internally.
 - Routed `ask_user`, sandbox access, plan approval, and tool approval responses from Telegram through the same native session APIs as terminal responses; Telegram prompts redact paths/secrets and omit tool arguments.
 - Made headless resolution policies promise-aware and kept runs open while asynchronous approval/suspension decisions are pending.
 - Extended the checked-in `telegram-shared-conversation` TUI scenario to resolve an `ask_user` prompt from Telegram.
-- Verified 9 focused files / 117 tests, package typecheck, package lint, `build:mastracode`, and the focused Telegram TUI e2e scenario.
+- Verified 9 focused files / 108 tests after the native Telegram binding update, package typecheck, package lint, `build:mastracode`, and the focused Telegram TUI e2e scenario.
+- Security checkpoint confirmed: sender/group/topic authorization remains broker-enforced, callback/reply metadata binds the exact pending prompt, only redacted summaries are sent, and stale or duplicate responses cannot resolve later work.
