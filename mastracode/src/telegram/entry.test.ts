@@ -25,9 +25,23 @@ describe('createTelegramCliHandlers', () => {
     const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mastracode-telegram-entry-'));
     const paths = resolveTelegramRuntimePaths(homeDir);
     fs.mkdirSync(paths.stateDir, { recursive: true });
-    fs.writeFileSync(paths.readinessFile, JSON.stringify({ schemaVersion: 1, initialized: true }));
+    const projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'mastracode-telegram-project-'));
+    fs.writeFileSync(
+      paths.readinessFile,
+      JSON.stringify({
+        schemaVersion: 1,
+        projects: [
+          {
+            projectPath: fs.realpathSync(projectPath),
+            threadId: 42,
+            initialized: true,
+            checkedAt: '2026-07-11T20:00:00.000Z',
+          },
+        ],
+      }),
+    );
     const importStockCli = vi.fn().mockResolvedValue(undefined);
-    const handlers = createTelegramCliHandlers({ homeDir, importStockCli });
+    const handlers = createTelegramCliHandlers({ homeDir, projectPath, importStockCli });
 
     try {
       await handlers.startTui();
@@ -37,6 +51,7 @@ describe('createTelegramCliHandlers', () => {
     } finally {
       delete process.env.MASTRACODE_SKILLS_SCOPE;
       fs.rmSync(homeDir, { recursive: true, force: true });
+      fs.rmSync(projectPath, { recursive: true, force: true });
     }
   });
 });
