@@ -11,6 +11,11 @@ import { AskQuestionInlineComponent } from '../components/ask-question-inline.js
 import type { SlashCommandContext } from './types.js';
 
 export async function handleUpdateCommand(ctx: SlashCommandContext): Promise<void> {
+  if (process.env.MASTRACODE_DISABLE_UPDATE_CHECK === '1' || process.env.MASTRACODE_TELEGRAM_ENABLED === '1') {
+    ctx.showInfo('Updates for this distribution are managed through @srdjancoric/mastracode-telegram.');
+    return;
+  }
+
   const currentVersion = ctx.state.options.version;
   if (!currentVersion) {
     ctx.showError('Could not determine the current version.');

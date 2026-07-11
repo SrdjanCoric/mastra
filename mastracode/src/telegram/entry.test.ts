@@ -77,9 +77,11 @@ describe('createTelegramCliHandlers', () => {
       await handlers.startTui();
 
       expect(process.env.MASTRACODE_SKILLS_SCOPE).toBe('mastracode');
+      expect(process.env.MASTRACODE_TELEGRAM_ENABLED).toBe('1');
       expect(importStockCli).toHaveBeenCalledOnce();
     } finally {
       delete process.env.MASTRACODE_SKILLS_SCOPE;
+      delete process.env.MASTRACODE_TELEGRAM_ENABLED;
       fs.rmSync(homeDir, { recursive: true, force: true });
       fs.rmSync(projectPath, { recursive: true, force: true });
     }

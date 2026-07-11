@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,7 @@ export const TELEGRAM_WORKFLOW_SKILLS = [
   'mastra-to-plan',
   'mastra-implement-next-task',
   'mastra-task-review',
+  'mastra-tdd',
   'mastra-diagnose',
   'mastra-handoff',
   'mastra-create-pr',
@@ -93,5 +95,6 @@ async function listFiles(root: string, directory = root): Promise<string[]> {
 
 function bundledSkillsDirectory(): string {
   const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(moduleDirectory, '../../assets/skills');
+  const packaged = path.resolve(moduleDirectory, '../assets/skills');
+  return existsSync(packaged) ? packaged : path.resolve(moduleDirectory, '../../assets/skills');
 }

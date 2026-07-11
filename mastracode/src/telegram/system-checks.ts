@@ -21,7 +21,7 @@ export async function checkSystemPrerequisites(runner: SystemCommandRunner = run
     throw new Error('Install Git, then rerun `mastracode-telegram --init`.');
   }
   if (!(await commandExists(runner, 'gh', ['--version']))) {
-    throw new Error('Install GitHub CLI, run `gh auth login`, then rerun `mastracode-telegram --init`.');
+    throw new Error(githubCliInstallInstructions());
   }
 }
 
@@ -87,8 +87,33 @@ export async function checkGitHubReadiness(
   try {
     await runner('gh', ['auth', 'status'], repository.canonicalPath);
   } catch {
-    throw new Error('GitHub authentication is missing or insufficient. Run `gh auth login`, then rerun init.');
+    throw new Error(githubAuthInstructions());
   }
+}
+
+export function githubCliInstallInstructions(): string {
+  return [
+    'Install GitHub CLI: the required `gh` command was not found.',
+    '',
+    'On macOS with Homebrew:',
+    '  brew install gh',
+    '',
+    'Then connect it to your GitHub account:',
+    '  gh auth login',
+    '',
+    'Choose GitHub.com, HTTPS, and Login with a web browser. Verify with `gh auth status`, then rerun `mastracode-telegram --init`.',
+  ].join('\n');
+}
+
+export function githubAuthInstructions(): string {
+  return [
+    'GitHub CLI is installed but is not connected to a GitHub account.',
+    '',
+    'Run:',
+    '  gh auth login',
+    '',
+    'Choose GitHub.com, HTTPS, and Login with a web browser. Verify with `gh auth status`, then rerun `mastracode-telegram --init`.',
+  ].join('\n');
 }
 
 async function commandExists(runner: SystemCommandRunner, command: string, args: string[]): Promise<boolean> {

@@ -2,16 +2,51 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
+
+import { cancel, confirm, isCancel, select } from '@clack/prompts';
+
 import { resolveTelegramRuntimePaths } from './runtime-paths.js';
+
+export interface TelegramInitChoice {
+  value: string;
+  label: string;
+  hint?: string;
+}
 
 export interface TelegramInitPrompter {
   ask(question: string): Promise<string>;
   askHidden?(question: string): Promise<string>;
+  confirm?(question: string, initialValue?: boolean): Promise<boolean>;
+  choose?(question: string, choices: readonly TelegramInitChoice[], initialValue?: string): Promise<string>;
 }
 
 export interface GuidedTelegramInitResult {
   confirmed: boolean;
   env: NodeJS.ProcessEnv;
+}
+
+export async function confirmInitChoice(
+  prompter: TelegramInitPrompter,
+  question: string,
+  initialValue = true,
+): Promise<boolean> {
+  if (prompter.confirm) return prompter.confirm(question, initialValue);
+  const answer = (await prompter.ask(`${question} ${initialValue ? '[Y/n]' : '[y/N]'}: `)).trim();
+  if (!answer) return initialValue;
+  return /^[Yy]/.test(answer);
+}
+
+export async function chooseInitChoice(
+  prompter: TelegramInitPrompter,
+  question: string,
+  choices: readonly TelegramInitChoice[],
+  initialValue?: string,
+): Promise<string> {
+  if (prompter.choose) return prompter.choose(question, choices, initialValue);
+  const answer = (await prompter.ask(`${question}${initialValue ? ` [${initialValue}]` : ''}: `)).trim().toLowerCase();
+  const selected = answer || initialValue;
+  if (selected && choices.some(choice => choice.value === selected)) return selected;
+  throw new Error(`${question} must be one of: ${choices.map(choice => choice.value).join(', ')}.`);
 }
 
 export async function prepareGuidedTelegramInit(options: {
@@ -22,9 +57,8 @@ export async function prepareGuidedTelegramInit(options: {
   write: (message: string) => void;
 }): Promise<GuidedTelegramInitResult> {
   options.write(`Project: ${options.projectPath}`);
-  if (options.prompter) {
-    const answer = await options.prompter.ask('Use this project directory? [Y/n]: ');
-    if (answer !== '' && !/^[Yy]/.test(answer)) return { confirmed: false, env: options.env };
+  if (options.prompter && !(await confirmInitChoice(options.prompter, 'Use this project directory?'))) {
+    return { confirmed: false, env: options.env };
   }
 
   const saved = await loadSavedConfigPresence(options.homeDir);
@@ -92,7 +126,34 @@ export function createTerminalInitPrompter(): TelegramInitPrompter | undefined {
         readline.close();
       }
     },
+    async confirm(question: string, initialValue = true): Promise<boolean> {
+      return requirePromptResult(
+        await confirm({
+          message: question,
+          initialValue,
+        }),
+      );
+    },
+    async choose(question: string, choices: readonly TelegramInitChoice[], initialValue?: string): Promise<string> {
+      return requirePromptResult(
+        await select({
+          message: question,
+          options: choices.map(choice => ({
+            value: choice.value,
+            label: choice.label,
+            ...(choice.hint ? { hint: choice.hint } : {}),
+          })),
+          ...(initialValue ? { initialValue } : {}),
+        }),
+      );
+    },
   };
+}
+
+function requirePromptResult<T>(result: T | symbol): T {
+  if (!isCancel(result)) return result as T;
+  cancel('Setup cancelled.');
+  throw new Error('Telegram setup was cancelled.');
 }
 
 async function loadSavedConfigPresence(homeDir: string): Promise<{

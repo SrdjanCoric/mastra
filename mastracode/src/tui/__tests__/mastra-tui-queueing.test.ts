@@ -292,35 +292,31 @@ describe('MastraTUI queueing', () => {
     },
   );
 
-  it('starts an idle Telegram message in the current TUI session', async () => {
+  it('starts an idle Telegram message through one native signal without an optimistic duplicate', async () => {
     const state = {
       session: {
         run: { isRunning: vi.fn(() => false) },
         model: { hasSelection: vi.fn(() => true) },
-        thread: { create: vi.fn() },
       },
-      pendingNewThread: false,
-      ui: { requestRender: vi.fn() },
     };
     const tui = Object.create(MastraTUI.prototype) as {
       state: typeof state;
       receiveExternalMessage: (message: { text: string; replyToMessageId?: number }) => Promise<void>;
       runUserPromptHook: (text: string) => Promise<boolean>;
+      signalMessage: (text: string, images?: undefined, options?: { label?: string }) => void;
       fireMessage: (text: string) => void;
     };
     tui.state = state;
     tui.runUserPromptHook = vi.fn().mockResolvedValue(true);
+    tui.signalMessage = vi.fn();
     tui.fireMessage = vi.fn();
 
     await tui.receiveExternalMessage({ text: 'start from Telegram' });
 
-    expect(mocks.addUserMessage).toHaveBeenCalledWith(
-      state,
-      expect.objectContaining({ role: 'user', content: [{ type: 'text', text: 'start from Telegram' }] }),
-      { label: 'Telegram' },
-    );
     expect(tui.runUserPromptHook).toHaveBeenCalledWith('start from Telegram');
-    expect(tui.fireMessage).toHaveBeenCalledWith('start from Telegram');
+    expect(tui.signalMessage).toHaveBeenCalledWith('start from Telegram', undefined, { label: 'Telegram' });
+    expect(tui.fireMessage).not.toHaveBeenCalled();
+    expect(mocks.addUserMessage).not.toHaveBeenCalled();
   });
 
   it('sends editor submissions as signals instead of resolving input while the controller is running', async () => {
