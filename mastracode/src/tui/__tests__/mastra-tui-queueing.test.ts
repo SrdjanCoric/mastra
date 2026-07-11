@@ -134,6 +134,57 @@ describe('MastraTUI queueing', () => {
     mocks.showError.mockReset();
   });
 
+  it('routes Telegram text through the native follow-up signal while a turn is running', async () => {
+    const state = {
+      session: {
+        run: { isRunning: vi.fn(() => true) },
+        model: { hasSelection: vi.fn(() => true) },
+      },
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (text: string) => Promise<void>;
+      signalMessage: (text: string, images?: undefined, options?: { label?: string }) => void;
+    };
+    tui.state = state;
+    tui.signalMessage = vi.fn();
+
+    await tui.receiveExternalMessage('continue from Telegram');
+
+    expect(tui.signalMessage).toHaveBeenCalledWith('continue from Telegram', undefined, { label: 'Telegram' });
+  });
+
+  it('starts an idle Telegram message in the current TUI session', async () => {
+    const state = {
+      session: {
+        run: { isRunning: vi.fn(() => false) },
+        model: { hasSelection: vi.fn(() => true) },
+        thread: { create: vi.fn() },
+      },
+      pendingNewThread: false,
+      ui: { requestRender: vi.fn() },
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (text: string) => Promise<void>;
+      runUserPromptHook: (text: string) => Promise<boolean>;
+      fireMessage: (text: string) => void;
+    };
+    tui.state = state;
+    tui.runUserPromptHook = vi.fn().mockResolvedValue(true);
+    tui.fireMessage = vi.fn();
+
+    await tui.receiveExternalMessage('start from Telegram');
+
+    expect(mocks.addUserMessage).toHaveBeenCalledWith(
+      state,
+      expect.objectContaining({ role: 'user', content: [{ type: 'text', text: 'start from Telegram' }] }),
+      { label: 'Telegram' },
+    );
+    expect(tui.runUserPromptHook).toHaveBeenCalledWith('start from Telegram');
+    expect(tui.fireMessage).toHaveBeenCalledWith('start from Telegram');
+  });
+
   it('sends editor submissions as signals instead of resolving input while the controller is running', async () => {
     const editor = {
       onSubmit: undefined as ((text: string) => void) | undefined,

@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { runTelegramBroker } from './broker-main.js';
 import type { TelegramCliHandlers } from './cli.js';
 import { createTerminalInitPrompter, prepareGuidedTelegramInit } from './guided-init.js';
 import type { TelegramInitPrompter } from './guided-init.js';
@@ -14,6 +15,7 @@ export interface TelegramCliEntryDependencies {
   prompter?: TelegramInitPrompter | false;
   write?: (message: string) => void;
   importStockCli?: () => Promise<unknown>;
+  runBroker?: (homeDir: string) => Promise<void>;
   initializeProject?: (options: {
     homeDir: string;
     projectPath: string;
@@ -28,6 +30,7 @@ export function createTelegramCliHandlers(dependencies: TelegramCliEntryDependen
   const resolvedHomeDir = homeDir ?? os.homedir();
   const paths = resolveTelegramRuntimePaths(homeDir);
   const importStockCli = dependencies.importStockCli ?? (() => import('../main.js'));
+  const startBroker = dependencies.runBroker ?? runTelegramBroker;
   const initializeProject = dependencies.initializeProject ?? initializeTelegramProject;
   const write = dependencies.write ?? (message => process.stdout.write(`${message}\n`));
 
@@ -57,9 +60,15 @@ export function createTelegramCliHandlers(dependencies: TelegramCliEntryDependen
       write('Next: run `mastracode-telegram` from this project.');
     },
     startTui: async () => {
-      assertTelegramInitialized(paths.readinessFile, projectPath);
+      const readiness = assertTelegramInitialized(paths.readinessFile, projectPath);
       process.env.MASTRACODE_SKILLS_SCOPE = 'mastracode';
+      process.env.MASTRACODE_TELEGRAM_ENABLED = '1';
+      process.env.MASTRACODE_TELEGRAM_HOME = resolvedHomeDir;
+      process.env.MASTRACODE_TELEGRAM_PROJECT_PATH = readiness.projectPath;
+      process.env.MASTRACODE_TELEGRAM_THREAD_ID = String(readiness.threadId);
+      process.env.MASTRACODE_TELEGRAM_EXECUTABLE = process.argv[1];
       await importStockCli();
     },
+    startBroker,
   };
 }

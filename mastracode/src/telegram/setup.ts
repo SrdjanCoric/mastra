@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { verifyTelegramRoundTripThroughBroker } from './broker-client.js';
 import { TELEGRAM_READINESS_SCHEMA_VERSION } from './readiness.js';
-import { resolveTelegramRuntimePaths } from './runtime-paths.js';
+import { resolveTelegramBrokerPaths, resolveTelegramRuntimePaths } from './runtime-paths.js';
 import { syncTelegramWorkflowSkills } from './skills.js';
 import {
   checkGitHubReadiness,
@@ -64,7 +65,7 @@ export async function initializeTelegramProject(
   await dependencies.checkPrerequisites();
   await dependencies.checkMastraCode(options.env);
 
-  const config = await loadConfig(options.env, paths.configDir);
+  const config = await loadTelegramRuntimeConfig(options.env, paths.configDir);
   const telegram = dependencies.createTelegramClient(config);
   await telegram.validateAuthorization();
   await saveConfig(paths.configDir, config);
@@ -75,7 +76,16 @@ export async function initializeTelegramProject(
   const topic = await attachProject(paths.stateDir, repository.canonicalPath, telegram);
 
   options.onProgress?.('Telegram: reply to the connectivity test message in the new project topic.');
-  await telegram.verifyRoundTrip(topic.project.threadId);
+  const brokerPaths = resolveTelegramBrokerPaths(options.homeDir, config.botToken);
+  try {
+    await verifyTelegramRoundTripThroughBroker({
+      socketPath: brokerPaths.socketPath,
+      threadId: topic.project.threadId,
+    });
+  } catch (error) {
+    if (!isMissingBrokerError(error)) throw error;
+    await telegram.verifyRoundTrip(topic.project.threadId);
+  }
   await fs.mkdir(paths.stateDir, { recursive: true });
   const checkedAt = dependencies.now().toISOString();
   await saveReadiness(paths.readinessFile, {
@@ -106,7 +116,10 @@ function createDefaultDependencies(): TelegramSetupDependencies {
   };
 }
 
-async function loadConfig(env: NodeJS.ProcessEnv, configDir: string): Promise<TelegramRuntimeConfig> {
+export async function loadTelegramRuntimeConfig(
+  env: NodeJS.ProcessEnv,
+  configDir: string,
+): Promise<TelegramRuntimeConfig> {
   const envBotToken = env.TELEGRAM_BOT_TOKEN?.trim();
   const envAllowedUserId = env.TELEGRAM_ALLOWED_USER_ID?.trim();
   const envGroupId = env.TELEGRAM_GROUP_ID?.trim();
@@ -256,6 +269,10 @@ function parseInteger(name: string, value: string): number {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) throw new Error(`${name} must be a safe integer`);
   return parsed;
+}
+
+function isMissingBrokerError(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && ['ENOENT', 'ECONNREFUSED'].includes(String(error.code));
 }
 
 function isMissingPathError(error: unknown): boolean {

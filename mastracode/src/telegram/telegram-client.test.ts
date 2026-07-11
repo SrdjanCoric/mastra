@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TelegramBotClient } from './telegram-client.js';
+import { TELEGRAM_MESSAGE_LIMIT, TelegramBotClient, splitTelegramMessage } from './telegram-client.js';
 
 const config = { botToken: 'top-secret-token', allowedUserId: 123, groupId: -100456 };
 
@@ -52,6 +52,41 @@ describe('TelegramBotClient authorization', () => {
 
     expect(expectedText).toMatch(/^verify [A-F0-9]{6}$/);
     expect(telegramFetch).toHaveBeenCalledTimes(5);
+  });
+
+  it('marks non-routable updates while preserving their offsets', async () => {
+    const telegramFetch = vi.fn().mockResolvedValue(
+      response([
+        {
+          update_id: 11,
+          message: {
+            message_thread_id: 42,
+            text: 'hello',
+            chat: { id: -100456 },
+            from: { id: 123 },
+          },
+        },
+        { update_id: 12, message: { text: 'outside', chat: { id: -999 }, from: { id: 123 } } },
+        { update_id: 13, message: { message_thread_id: 42, chat: { id: -100456 }, from: { id: 123 } } },
+      ]),
+    );
+
+    const updates = await new TelegramBotClient(config, telegramFetch).getTextUpdates(11);
+
+    expect(updates).toEqual([
+      { updateId: 11, userId: 123, threadId: 42, text: 'hello' },
+      { updateId: 12, userId: 123, threadId: 0, text: 'outside', routable: false },
+      { updateId: 13, userId: 123, threadId: 42, text: '', routable: false },
+    ]);
+  });
+
+  it('splits long code blocks into valid, balanced Telegram messages', () => {
+    const chunks = splitTelegramMessage(`Before\n\`\`\`ts\n${'const value = 1;\n'.repeat(400)}\`\`\`\nAfter`);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every(chunk => Array.from(chunk).length <= TELEGRAM_MESSAGE_LIMIT)).toBe(true);
+    expect(chunks.every(chunk => (chunk.match(/^```/gm)?.length ?? 0) % 2 === 0)).toBe(true);
+    expect(chunks.slice(1).some(chunk => chunk.startsWith('```ts\n'))).toBe(true);
   });
 
   it('rejects invalid credentials without exposing the token', async () => {

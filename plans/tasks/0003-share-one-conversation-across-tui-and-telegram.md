@@ -12,20 +12,26 @@ Adapt `mastracode-remote`'s `daemon`, `TelegramBotClient`, `TelegramUpdateRouter
 
 ## AFK tasks
 
-- [ ] Add failing broker, adapter, and TUI integration tests for first-client startup, second-project reuse, topic isolation, startup races, authorized text, active-turn queueing, idle delivery, source presentation, assistant completion delivery, long-message splitting, unsupported attachments, disconnects, and last-client shutdown.
-- [ ] Adapt the remote daemon/poller into an ephemeral single-instance broker with a user-only Unix socket, versioned IPC, project/topic registration, and no launchd integration.
-- [ ] Create a project adapter lifecycle owned by each TUI process and bind it to the existing controller/session instead of a headless run or PTY.
-- [ ] Expose the narrow TUI/session integration points needed to enqueue broker-delivered follow-ups and observe completed assistant messages without duplicating TUI state.
-- [ ] Make init's bidirectional connectivity test use the active broker when present and otherwise acquire the broker lock temporarily before polling.
-- [ ] Preserve code blocks where practical when splitting long Telegram output and suppress streaming/tool/command noise.
+- [x] Add failing broker, adapter, and TUI integration tests for first-client startup, second-project reuse, topic isolation, startup races, authorized text, active-turn queueing, idle delivery, source presentation, assistant completion delivery, long-message splitting, unsupported attachments, disconnects, and last-client shutdown.
+- [x] Adapt the remote daemon/poller into an ephemeral single-instance broker with a user-only Unix socket, versioned IPC, project/topic registration, and no launchd integration.
+- [x] Create a project adapter lifecycle owned by each TUI process and bind it to the existing controller/session instead of a headless run or PTY.
+- [x] Expose the narrow TUI/session integration points needed to enqueue broker-delivered follow-ups and observe completed assistant messages without duplicating TUI state.
+- [x] Make init's bidirectional connectivity test use the active broker when present and otherwise acquire the broker lock temporarily before polling.
+- [x] Preserve code blocks where practical when splitting long Telegram output and suppress streaming/tool/command noise.
 
 ## Acceptance criteria
 
-- [ ] `mastracode-telegram` renders the stock TUI, starts or connects to exactly one broker per bot token, and registers exactly one adapter for the initialized canonical project/topic.
-- [ ] Two project TUIs can share one private forum group concurrently, and each topic routes only to its registered project session.
-- [ ] Terminal and Telegram messages share the same session and active thread for that project.
-- [ ] Telegram messages received during a turn use the native follow-up queue and do not interrupt it.
-- [ ] Telegram-originated messages are identifiable in the TUI while model input remains the original text.
-- [ ] Completed assistant messages from either input surface reach Telegram once; transient output does not.
-- [ ] Closing one TUI unregisters only its project; closing the last client causes the broker to exit after its grace period.
-- [ ] Focused broker/unit/integration tests, multi-TUI routing tests, TUI tests, lint, typecheck, and build pass.
+- [x] `mastracode-telegram` renders the stock TUI, starts or connects to exactly one broker per bot token, and registers exactly one adapter for the initialized canonical project/topic.
+- [x] Two project TUIs can share one private forum group concurrently, and each topic routes only to its registered project session.
+- [x] Terminal and Telegram messages share the same session and active thread for that project.
+- [x] Telegram messages received during a turn use the native follow-up queue and do not interrupt it.
+- [x] Telegram-originated messages are identifiable in the TUI while model input remains the original text.
+- [x] Completed assistant messages from either input surface reach Telegram once; transient output does not.
+- [x] Closing one TUI unregisters only its project; closing the last client causes the broker to exit after its grace period.
+- [x] Focused broker/unit/integration tests, multi-TUI routing tests, TUI tests, lint, typecheck, and build pass.
+
+## Implementation log
+
+- Added a token-scoped ephemeral broker with versioned Unix-socket IPC, ownership locking, shared polling, topic isolation, active-broker init verification, and last-client shutdown.
+- Bound Telegram input/output to the stock TUI session: idle input starts a turn, active input uses native signals, Telegram source labels remain presentation-only, and only completed assistant messages are forwarded.
+- Added focused broker/TUI tests plus the checked-in `telegram-shared-conversation` TUI e2e scenario; focused tests, e2e, typecheck, lint, and package build pass.

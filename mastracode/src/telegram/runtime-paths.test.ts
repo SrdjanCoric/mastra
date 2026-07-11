@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveTelegramRuntimePaths } from './runtime-paths.js';
+import { resolveTelegramBrokerPaths, resolveTelegramRuntimePaths } from './runtime-paths.js';
 
 describe('resolveTelegramRuntimePaths', () => {
   it('keeps all Telegram experiment data under its own runtime root', () => {
@@ -18,5 +18,13 @@ describe('resolveTelegramRuntimePaths', () => {
       readinessFile: path.join(root, 'state', 'ready.json'),
     });
     expect(Object.values(paths).every(value => !value.includes('.mastracode-remote'))).toBe(true);
+  });
+
+  it('derives private broker paths without exposing the bot token', () => {
+    const paths = resolveTelegramBrokerPaths('/test/home', '12345:super-secret');
+
+    expect(paths.socketPath).toContain(path.join('.mastracode-telegram', 'runtime', 'broker-'));
+    expect(paths.lockPath).toContain(path.join('.mastracode-telegram', 'runtime', 'broker-'));
+    expect(JSON.stringify(paths)).not.toContain('super-secret');
   });
 });

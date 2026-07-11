@@ -257,7 +257,7 @@ export function addPendingUserMessage(
   messageId: string,
   text: string,
   images?: Array<{ data: string; mimeType: string }>,
-  options?: { isInterjection?: boolean },
+  options?: { isInterjection?: boolean; label?: string },
 ): void {
   const existing = state.pendingSignalMessageComponentsById.get(messageId);
   if (existing) {
@@ -265,12 +265,13 @@ export function addPendingUserMessage(
     reconcileChatBoundarySpacers(state.chatContainer);
   }
 
-  const component = new PendingUserMessageComponent(text, images?.length ?? 0);
+  const component = new PendingUserMessageComponent(text, images?.length ?? 0, options?.label);
   state.pendingSignalMessageComponentsById.set(messageId, {
     component,
     text,
     images,
     isInterjection: options?.isInterjection,
+    label: options?.label,
   });
   state.chatContainer.addChild(component);
   reconcileChatBoundarySpacers(state.chatContainer);
@@ -295,7 +296,7 @@ function replacePendingUserMessage(state: TUIState, messageId: string, text: str
 
   const imageCount = pending.images?.length ?? 0;
   const prefix = imageCount > 0 ? `[${imageCount} image${imageCount > 1 ? 's' : ''}] ` : '';
-  const label = getPendingUserMessageLabel(pending.isInterjection);
+  const label = pending.label ?? getPendingUserMessageLabel(pending.isInterjection);
   const confirmed = new UserMessageComponent(prefix + text, getMarkdownTheme(), {
     ...(label ? { label } : {}),
   });
@@ -341,7 +342,7 @@ function confirmMatchingPendingUserMessage(state: TUIState, messageId: string, t
   for (const [pendingId, pending] of state.pendingSignalMessageComponentsById) {
     if (pending.text.trim() !== normalizedText) continue;
 
-    const label = getPendingUserMessageLabel(pending.isInterjection);
+    const label = pending.label ?? getPendingUserMessageLabel(pending.isInterjection);
     const confirmed = new UserMessageComponent(text, getMarkdownTheme(), {
       ...(label ? { label } : {}),
     });

@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import type { TelegramTextUpdate } from './broker.js';
 import type { TelegramRuntimeConfig } from './setup.js';
 
 export interface TelegramProjectClient {
@@ -98,6 +99,34 @@ export class TelegramBotClient implements TelegramProjectClient {
     }
   }
 
+  async getTextUpdates(offset: number | undefined, signal?: AbortSignal): Promise<TelegramTextUpdate[]> {
+    const response = await this.request<TelegramUpdate[]>(
+      'getUpdates',
+      {
+        ...(offset === undefined ? {} : { offset }),
+        timeout: 25,
+        allowed_updates: JSON.stringify(['message']),
+      },
+      signal,
+    );
+
+    return (response.result ?? []).map(update => {
+      const message = update.message;
+      const routable =
+        message?.chat?.id === this.config.groupId &&
+        message.from?.id !== undefined &&
+        message.message_thread_id !== undefined &&
+        message.text !== undefined;
+      return {
+        updateId: update.update_id,
+        userId: message?.from?.id ?? 0,
+        threadId: message?.message_thread_id ?? 0,
+        text: message?.text ?? '',
+        ...(routable ? {} : { routable: false }),
+      };
+    });
+  }
+
   async verifyRoundTrip(threadId: number): Promise<void> {
     const baseline = await this.request<TelegramUpdate[]>('getUpdates', {
       offset: -1,
@@ -148,11 +177,13 @@ export class TelegramBotClient implements TelegramProjectClient {
   private async request<T = unknown>(
     method: string,
     body: Record<string, string | number>,
+    signal?: AbortSignal,
   ): Promise<TelegramResponse<T>> {
     const response = await this.telegramFetch(`https://api.telegram.org/bot${this.config.botToken}/${method}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
+      signal,
     });
     const payload = (await response.json()) as TelegramResponse<T>;
     if (!response.ok || !payload.ok) {
@@ -168,12 +199,38 @@ export class TelegramBotClient implements TelegramProjectClient {
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
 
 export function splitTelegramMessage(text: string): string[] {
-  const characters = Array.from(text);
+  if (!text) return [''];
   const chunks: string[] = [];
-  for (let offset = 0; offset < characters.length; offset += TELEGRAM_MESSAGE_LIMIT) {
-    chunks.push(characters.slice(offset, offset + TELEGRAM_MESSAGE_LIMIT).join(''));
+  let remaining = text;
+  let openFenceLanguage: string | undefined;
+
+  while (Array.from(remaining).length > TELEGRAM_MESSAGE_LIMIT) {
+    const characters = Array.from(remaining);
+    const hardLimit = TELEGRAM_MESSAGE_LIMIT - 4;
+    const candidate = characters.slice(0, hardLimit).join('');
+    const newlineIndex = candidate.lastIndexOf('\n');
+    const splitAt = newlineIndex >= Math.floor(hardLimit * 0.6) ? newlineIndex + 1 : candidate.length;
+    let chunk = candidate.slice(0, splitAt);
+    remaining = characters.slice(Array.from(chunk).length).join('');
+
+    openFenceLanguage = findOpenCodeFence(chunk);
+    if (openFenceLanguage !== undefined) {
+      chunk = `${chunk.replace(/\s*$/, '')}\n\`\`\``;
+      remaining = `\`\`\`${openFenceLanguage}\n${remaining}`;
+    }
+    chunks.push(chunk);
   }
-  return chunks.length === 0 ? [''] : chunks;
+
+  chunks.push(remaining);
+  return chunks;
+}
+
+function findOpenCodeFence(chunk: string): string | undefined {
+  let language: string | undefined;
+  for (const match of chunk.matchAll(/^```([^\s`]*)[^\n]*$/gm)) {
+    language = language === undefined ? (match[1] ?? '') : undefined;
+  }
+  return language;
 }
 
 function nextUpdateOffset(updates: TelegramUpdate[]): number | undefined {
