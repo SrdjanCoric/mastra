@@ -2,6 +2,9 @@ Unless user explicitly asks do not inspect reference or modify examples
 Prefer most specific AGENTS.md for changed area
 For work in packages read package local packages/<name>/AGENTS.md first
 
+Project architecture: `ARCHITECTURE.md`.
+Active plan: `plans/PLAN.md`. Task bodies live in `plans/tasks/`; finished tasks move to `plans/tasks/done/`.
+
 turborepo pnpm workspace
 packages use strict TypeScript
 vitest tests are colocated with source

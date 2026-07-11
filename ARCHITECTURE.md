@@ -1,0 +1,59 @@
+# MastraCode Telegram TUI architecture
+
+Status: agreed for the `experiment/telegram-tui` branch on 2026-07-11.
+
+## Goal
+
+Add an optional Telegram interface to the stock MastraCode TUI. `mastracode --telegram-init` prepares an isolated Telegram runtime, and `mastracode --telegram` starts the normal TUI with Telegram attached to the same controller, session, and active thread. Ordinary `mastracode` behavior remains unchanged.
+
+The adjacent `../mastracode-remote` repository at baseline `3a68c86` is implementation input for Telegram setup, project registration, security, routing, and tests. The Mastra repository is the implementation and publication repository; do not modify the production checkout outside this workspace.
+
+Repository isolation is explicit: the Mastra checkout pushes only to the `SrdjanCoric/mastra` fork and fetches upstream from `mastra-ai/mastra`; the bridge checkout pushes only to the private `SrdjanCoric/mastracode-remote-telegram` experiment repository and fetches upstream from `SrdjanCoric/mastracode-remote`. Push URLs for both upstream remotes are disabled.
+
+## Runtime ownership and isolation
+
+- The TUI process owns the controller, session, active thread, Telegram adapter, and polling lifecycle.
+- Closing the TUI ends Telegram control. Long-lived detached operation uses an external terminal multiplexer; a daemon and attachable TUI are not part of v1.
+- Telegram-enabled runs use an experiment-specific configuration directory, state, session files, package/runtime identity, project locks, logs, readiness markers, and Telegram bot or test group.
+- The experiment must not read or write production `~/.mastracode-remote/` state, control its launchd service, or publish over its runtime package version.
+- Only one Telegram-enabled TUI may own a canonical project path at a time. Locks must be released safely after normal exit or crash recovery.
+
+## Setup and skills
+
+- `--telegram-init` adapts the proven remote setup flow without installing launchd. It validates MastraCode authentication/model readiness, Git and author identity, GitHub CLI/repository readiness, Telegram credentials and private forum routing, managed workflow skills, isolated readiness state, and an end-to-end Telegram test.
+- Skill discovery for this build is limited to `<project>/.mastracode/skills` and `~/.mastracode/skills`. `.claude/skills`, `.agents/skills`, and other agent-specific locations are excluded in both ordinary and Telegram-enabled runs.
+- The existing packaged-runtime patch is source material only. Its asynchronous policy resolution and scoped skill discovery behavior must be implemented in TypeScript source with focused tests, not by editing compiled `dist` files.
+
+## Routing and messages
+
+- Each canonical project path maps to one persistent Telegram forum topic.
+- The topic follows the thread currently active in the TUI. Thread creation and switching remain native terminal operations; Telegram receives a short thread-change notice.
+- Ordinary Telegram text enters the session's native follow-up queue and never injects PTY keystrokes or starts a second headless run.
+- Telegram receives completed assistant messages, prompt/approval requests, thread changes, and start/completion/interruption/failure events. It does not receive token streaming, transient TUI output, tool noise, shell output, secrets, or full transcripts.
+- Telegram-originated text is visibly identified in the TUI, while the model receives the original content without a decorative prefix.
+- V1 accepts text only. Unsupported attachments get a clear response. Long messages are split around Telegram limits while preserving code blocks when practical.
+
+## Commands and control
+
+- Telegram v1 exposes `/status`, `/stop`, and `/help` only.
+- `/status` is deterministic and includes project, active thread, model, mode, run state, safe current task/tool summary, queued follow-up count, active-turn duration, and Telegram health. It excludes command output, secrets, prompts, and transcripts.
+- `/stop` aborts the active turn/tool execution, clears queued Telegram follow-ups, and leaves the TUI, connection, and thread alive. Telegram cannot terminate the process.
+- Model selection, thread switching, settings, shell passthrough, and privileged TUI commands remain terminal-only.
+
+## Questions, approvals, and security
+
+- One configured operator may answer the same prompt-specific questions and approval requests from either surface.
+- Each pending interaction has a unique identity. Delayed or duplicate Telegram updates cannot resolve a later prompt, and an interaction answered locally is not replayed remotely.
+- Control is accepted only when sender ID, private group, and project topic match saved configuration. Risk context is redacted and nothing is approved automatically.
+
+## Failure and recovery
+
+- Telegram failure degrades to local-only operation. The TUI remains usable and displays connection state while polling retries with bounded exponential backoff.
+- Reconnection sends a recovery notice and current status. A bounded delivery queue prioritizes completed conversation messages over low-priority notices.
+- Update offsets and processed message IDs are persisted to prevent duplicates. Follow-ups remain owned by the live process; instructions not executed before a crash are reported as unprocessed and require resubmission.
+- Missing topics use safe topic recovery or report the exact repair action.
+- Default logs contain lifecycle, retry, routing, project/thread, prompt, and Telegram identifiers only. Tokens, message bodies, assistant content, command output, approval arguments, and file contents are excluded. Debug diagnostics remain redacted.
+
+## Publication gate
+
+Publication requires isolated init, stock TUI rendering, one shared session/thread across both surfaces, native follow-up queue behavior, mirrored completed messages, cross-surface prompts and approvals, correct model/thread reflection, command behavior, safe reconnect/deduplication/stale-reply/topic/crash handling, unchanged ordinary CLI behavior, MastraCode-only skill discovery, untouched production state, focused tests, TUI end-to-end tests, packaging checks, and a manual live Telegram test.
