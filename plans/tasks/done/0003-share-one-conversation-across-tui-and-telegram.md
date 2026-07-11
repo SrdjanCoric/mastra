@@ -35,3 +35,4 @@ Adapt `mastracode-remote`'s `daemon`, `TelegramBotClient`, `TelegramUpdateRouter
 - Added a token-scoped ephemeral broker with versioned Unix-socket IPC, ownership locking, shared polling, topic isolation, active-broker init verification, and last-client shutdown.
 - Bound Telegram input/output to the stock TUI session: idle input starts a turn, active input uses native signals, Telegram source labels remain presentation-only, and only completed assistant messages are forwarded.
 - Added focused broker/TUI tests plus the checked-in `telegram-shared-conversation` TUI e2e scenario; focused tests, e2e, typecheck, lint, and package build pass.
+- Merged as PR #3 at `e29e7fd9c50aecbe438c2e34dafae42928274f3d`.
