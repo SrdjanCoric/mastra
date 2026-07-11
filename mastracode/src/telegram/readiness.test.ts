@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -12,5 +13,19 @@ describe('assertTelegramInitialized', () => {
     expect(() => assertTelegramInitialized(readinessFile)).toThrow(
       'Telegram is not initialized. Run `mastracode-telegram --init` from this project first.',
     );
+  });
+
+  it('rejects a marker that does not prove setup completed', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mastracode-telegram-readiness-'));
+    const readinessFile = path.join(directory, 'ready.json');
+    fs.writeFileSync(readinessFile, '{}');
+
+    try {
+      expect(() => assertTelegramInitialized(readinessFile)).toThrow(
+        'Telegram is not initialized. Run `mastracode-telegram --init` from this project first.',
+      );
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

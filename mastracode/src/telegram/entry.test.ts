@@ -25,7 +25,7 @@ describe('createTelegramCliHandlers', () => {
     const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mastracode-telegram-entry-'));
     const paths = resolveTelegramRuntimePaths(homeDir);
     fs.mkdirSync(paths.stateDir, { recursive: true });
-    fs.writeFileSync(paths.readinessFile, '{}');
+    fs.writeFileSync(paths.readinessFile, JSON.stringify({ schemaVersion: 1, initialized: true }));
     const importStockCli = vi.fn().mockResolvedValue(undefined);
     const handlers = createTelegramCliHandlers({ homeDir, importStockCli });
 
