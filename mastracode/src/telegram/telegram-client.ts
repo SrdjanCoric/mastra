@@ -24,10 +24,17 @@ export class TelegramBotClient implements TelegramProjectClient {
   async validateAuthorization(): Promise<void> {
     try {
       await this.request('getMe', {});
-      const chat = await this.request<{ is_forum?: boolean }>('getChat', { chat_id: this.config.groupId });
-      if (chat.result?.is_forum !== true) {
+      const chat = await this.request<{ is_forum?: boolean; type?: string; username?: string }>('getChat', {
+        chat_id: this.config.groupId,
+      });
+      if (chat.result?.type !== 'supergroup' || chat.result.is_forum !== true) {
         throw new Error(
-          `group ${this.config.groupId} is not a forum with Topics enabled. Enable Topics, add the bot, and rerun init.`,
+          `group ${this.config.groupId} is not a forum supergroup with Topics enabled. Enable Topics, add the bot, and rerun init.`,
+        );
+      }
+      if (chat.result.username) {
+        throw new Error(
+          `group ${this.config.groupId} is public. Remove its public username so Telegram control remains private, then rerun init.`,
         );
       }
       const member = await this.request<{ status?: string }>('getChatMember', {
@@ -52,7 +59,9 @@ export class TelegramBotClient implements TelegramProjectClient {
       if (/upgraded to a supergroup/i.test(message)) {
         throw new Error(formatMigratedGroupMessage(message));
       }
-      if (/not a forum|allowed user/i.test(message)) throw new Error(`Telegram authorization failed: ${message}`);
+      if (/not a forum|allowed user|is public/i.test(message)) {
+        throw new Error(`Telegram authorization failed: ${message}`);
+      }
       throw new Error(`Telegram validation failed: ${message}`);
     }
   }

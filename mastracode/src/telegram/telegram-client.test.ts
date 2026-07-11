@@ -12,7 +12,7 @@ describe('TelegramBotClient authorization', () => {
     const telegramFetch = vi
       .fn()
       .mockResolvedValueOnce(response({ id: 1 }))
-      .mockResolvedValueOnce(response({ is_forum: true }))
+      .mockResolvedValueOnce(response({ is_forum: true, type: 'supergroup' }))
       .mockResolvedValueOnce(response({ status: 'member' }));
 
     await new TelegramBotClient(config, telegramFetch).validateAuthorization();
@@ -37,15 +37,24 @@ describe('TelegramBotClient authorization', () => {
       .mockResolvedValueOnce(response({ is_forum: false }));
 
     await expect(new TelegramBotClient(config, telegramFetch).validateAuthorization()).rejects.toThrow(
-      'not a forum with Topics enabled',
+      'not a forum supergroup with Topics enabled',
     );
+  });
+
+  it('rejects a public forum group', async () => {
+    const telegramFetch = vi
+      .fn()
+      .mockResolvedValueOnce(response({ id: 1 }))
+      .mockResolvedValueOnce(response({ is_forum: true, type: 'supergroup', username: 'public-group' }));
+
+    await expect(new TelegramBotClient(config, telegramFetch).validateAuthorization()).rejects.toThrow('is public');
   });
 
   it('rejects a user outside the configured group', async () => {
     const telegramFetch = vi
       .fn()
       .mockResolvedValueOnce(response({ id: 1 }))
-      .mockResolvedValueOnce(response({ is_forum: true }))
+      .mockResolvedValueOnce(response({ is_forum: true, type: 'supergroup' }))
       .mockResolvedValueOnce(response({ status: 'left' }));
 
     await expect(new TelegramBotClient(config, telegramFetch).validateAuthorization()).rejects.toThrow(

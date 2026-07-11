@@ -24,7 +24,8 @@ export function assertTelegramInitialized(readinessFile: string, projectPath: st
     if (
       readiness.schemaVersion === TELEGRAM_READINESS_SCHEMA_VERSION &&
       project?.initialized === true &&
-      Number.isInteger(project.threadId)
+      Number.isInteger(project.threadId) &&
+      project.threadId > 0
     ) {
       return project;
     }

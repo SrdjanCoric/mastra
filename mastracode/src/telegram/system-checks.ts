@@ -11,14 +11,16 @@ export interface InspectedRepository {
   hasGitHubRemote: boolean;
 }
 
-export async function checkSystemPrerequisites(): Promise<void> {
+export type SystemCommandRunner = (command: string, args: string[], cwd?: string) => Promise<string>;
+
+export async function checkSystemPrerequisites(runner: SystemCommandRunner = run): Promise<void> {
   if (Number(process.versions.node.split('.')[0]) < 22) {
     throw new Error('Install Node 22 or newer, then rerun `mastracode-telegram --init`.');
   }
-  if (!(await commandExists('git', ['--version']))) {
+  if (!(await commandExists(runner, 'git', ['--version']))) {
     throw new Error('Install Git, then rerun `mastracode-telegram --init`.');
   }
-  if (!(await commandExists('gh', ['--version']))) {
+  if (!(await commandExists(runner, 'gh', ['--version']))) {
     throw new Error('Install GitHub CLI, run `gh auth login`, then rerun `mastracode-telegram --init`.');
   }
 }
@@ -43,14 +45,17 @@ export async function checkMastraCodeReadiness(env: NodeJS.ProcessEnv): Promise<
   );
 }
 
-export async function inspectGitRepository(projectPath: string): Promise<InspectedRepository> {
+export async function inspectGitRepository(
+  projectPath: string,
+  runner: SystemCommandRunner = run,
+): Promise<InspectedRepository> {
   try {
-    const root = await run('git', ['rev-parse', '--show-toplevel'], projectPath);
+    const root = await runner('git', ['rev-parse', '--show-toplevel'], projectPath);
     const canonicalPath = await fs.realpath(root);
     const [authorName, authorEmail, remotes] = await Promise.all([
-      run('git', ['config', 'user.name'], canonicalPath),
-      run('git', ['config', 'user.email'], canonicalPath),
-      run('git', ['remote', '-v'], canonicalPath),
+      runner('git', ['config', 'user.name'], canonicalPath),
+      runner('git', ['config', 'user.email'], canonicalPath),
+      runner('git', ['remote', '-v'], canonicalPath),
     ]);
     if (!authorName || !authorEmail) {
       throw new Error(
@@ -72,27 +77,30 @@ export async function inspectGitRepository(projectPath: string): Promise<Inspect
   }
 }
 
-export async function checkGitHubReadiness(repository: InspectedRepository): Promise<void> {
+export async function checkGitHubReadiness(
+  repository: InspectedRepository,
+  runner: SystemCommandRunner = run,
+): Promise<void> {
   if (!repository.hasGitHubRemote) {
     throw new Error('No GitHub remote is configured. Add one or run `gh repo create`, then rerun init.');
   }
   try {
-    await run('gh', ['auth', 'status'], repository.canonicalPath);
+    await runner('gh', ['auth', 'status'], repository.canonicalPath);
   } catch {
     throw new Error('GitHub authentication is missing or insufficient. Run `gh auth login`, then rerun init.');
   }
 }
 
-async function commandExists(command: string, args: string[]): Promise<boolean> {
+async function commandExists(runner: SystemCommandRunner, command: string, args: string[]): Promise<boolean> {
   try {
-    await execFileAsync(command, args);
+    await runner(command, args);
     return true;
   } catch {
     return false;
   }
 }
 
-async function run(command: string, args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync(command, args, { cwd });
+async function run(command: string, args: string[], cwd?: string): Promise<string> {
+  const { stdout } = await execFileAsync(command, args, { encoding: 'utf8', ...(cwd ? { cwd } : {}) });
   return stdout.trim();
 }
