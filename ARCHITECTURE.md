@@ -1,14 +1,16 @@
 # MastraCode Telegram TUI architecture
 
-Status: agreed for the `experiment/telegram-tui` branch on 2026-07-11.
+Status: agreed product architecture, updated 2026-07-12.
 
 ## Goal
 
-Add an optional Telegram interface to the stock MastraCode TUI as the separately published npm package `@srdjancoric/mastracode-telegram`. `mastracode-telegram --init` prepares its isolated runtime, and `mastracode-telegram` starts the normal TUI with Telegram attached to the same controller, session, and active thread. The package is built and published only from the monorepo's `mastracode/` workspace. The official `mastracode` package and executable remain unchanged and can coexist without being overwritten.
+Publish `mastracode-remote` as MastraCode with Telegram. `mastracode-remote --init` prepares its isolated runtime, and `mastracode-remote` starts the normal terminal TUI with Telegram attached to the same controller, session, and active thread. There is no headless daemon mode. The package is built and published only from the monorepo's `mastracode/` workspace. The official `mastracode` package and executable remain unchanged and can coexist without being overwritten.
 
-The adjacent `../mastracode-remote` repository at baseline `3a68c86` is implementation input for Telegram setup, project registration, security, routing, and tests. The Mastra repository is the implementation and publication repository; do not modify the production checkout outside this workspace.
+Package description: "MastraCode with Telegram. Run the normal terminal TUI and continue the same session from Telegram."
 
-Repository isolation is explicit: the Mastra checkout pushes only to the `SrdjanCoric/mastra` fork and fetches upstream from `mastra-ai/mastra`; the bridge checkout pushes only to the private `SrdjanCoric/mastracode-remote-telegram` experiment repository and fetches upstream from `SrdjanCoric/mastracode-remote`. Push URLs for both upstream remotes are disabled.
+The Mastra repository is the implementation and publication repository. Telegram setup, routing, recovery, and tests are maintained in this codebase without a runtime or planning dependency on another repository.
+
+Repository isolation is explicit: the Mastra checkout pushes only to the `SrdjanCoric/mastra` fork and fetches upstream from `mastra-ai/mastra`. The upstream remote has a disabled push URL.
 
 ## Runtime ownership and isolation
 
@@ -16,13 +18,13 @@ Repository isolation is explicit: the Mastra checkout pushes only to the `Srdjan
 - One ephemeral local broker per configured bot token owns the single Telegram polling connection, global update offset, deduplication state, outbound API calls, and routing between the private forum topics and connected TUI processes.
 - The first Telegram-enabled TUI starts the broker on demand. Additional project TUIs connect through a user-only Unix socket. After the last TUI disconnects, the broker exits after a short grace period; it is not installed with launchd and does not survive as a login service.
 - Closing one TUI ends Telegram control for that project. Closing the last connected TUI ends the broker and all Telegram control. Long-lived detached TUI operation may still use an external terminal multiplexer.
-- Telegram-enabled runs use an experiment-specific configuration directory, state, session files, package/runtime identity, broker socket/PID/offset state, project locks, logs, readiness markers, and Telegram bot or test group.
-- The experiment must not read or write production `~/.mastracode-remote/` state, control its launchd service, or publish over its runtime package version.
+- Telegram-enabled runs use a version-isolated configuration directory, state, session files, broker socket/PID/offset state, project locks, logs, readiness markers, and Telegram bot or test group.
+- The TUI-backed implementation must not read or write legacy `mastracode-remote` 0.1.x state, control its launchd service, or start its headless daemon.
 - Only one Telegram-enabled TUI may own a canonical project path at a time. The broker permits different canonical projects to run concurrently and routes each one only through its registered topic. Locks and registrations must be released safely after normal exit or crash recovery.
 
 ## Setup and skills
 
-- `mastracode-telegram --init` adapts the proven remote setup flow without installing launchd. It validates MastraCode authentication/model readiness, Git and author identity, GitHub CLI/repository readiness, Telegram credentials and private forum routing, managed workflow skills, isolated readiness state, and an end-to-end Telegram test. The test uses the broker when one is active and otherwise temporarily owns the bot update connection under the same broker lock, so it cannot consume updates from a running TUI.
+- `mastracode-remote --init` adapts the proven setup flow without installing launchd. It validates MastraCode authentication/model readiness, Git and author identity, GitHub CLI/repository readiness, Telegram credentials and private forum routing, managed workflow skills, isolated readiness state, and an end-to-end Telegram test. The test uses the broker when one is active and otherwise temporarily owns the bot update connection under the same broker lock, so it cannot consume updates from a running TUI.
 - Skill discovery for this build is limited to `<project>/.mastracode/skills` and `~/.mastracode/skills`. `.claude/skills`, `.agents/skills`, and other agent-specific locations are excluded in both ordinary and Telegram-enabled runs.
 - The existing packaged-runtime patch is source material only. Its asynchronous policy resolution and scoped skill discovery behavior must be implemented in TypeScript source with focused tests, not by editing compiled `dist` files.
 
@@ -60,4 +62,4 @@ Repository isolation is explicit: the Mastra checkout pushes only to the `Srdjan
 
 ## Publication gate
 
-Publication requires isolated init, an ephemeral single-poller broker, concurrent routing for multiple project topics in one private group, stock TUI rendering, one shared session/thread per project across both surfaces, native follow-up queue behavior, mirrored completed messages, cross-surface prompts and approvals, correct model/thread reflection, command behavior, safe broker/client reconnect and deduplication/stale-reply/topic/crash handling, unchanged ordinary CLI behavior, MastraCode-only skill discovery, untouched production state, focused tests, multi-TUI broker integration tests, TUI end-to-end tests, packaging checks, and a manual live Telegram test.
+Publication requires isolated init, an ephemeral single-poller broker, concurrent routing for multiple project topics in one private group, visible stock TUI rendering with no headless daemon mode, one shared session/thread per project across both surfaces, native follow-up queue behavior, mirrored completed messages, cross-surface prompts and approvals, correct model/thread reflection, command behavior, safe broker/client reconnect and deduplication/stale-reply/topic/crash handling, unchanged ordinary CLI behavior, MastraCode-only skill discovery, untouched legacy state, focused tests, multi-TUI broker integration tests, TUI end-to-end tests, packaging checks, and a manual live Telegram test.
