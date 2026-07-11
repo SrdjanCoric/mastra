@@ -13,26 +13,26 @@ This is the project's master plan: a durable architectural header plus an ordere
 
 ## Architectural decisions
 
-- **Process model**: the stock TUI process owns one controller, session, active thread, and optional Telegram adapter; no PTY injection, second headless run, daemon, or attachable TUI.
+- **Process model**: each stock TUI owns its controller, session, active thread, and project adapter; one ephemeral local broker per bot token owns Telegram polling for all connected projects. There is no PTY injection, second headless run, launchd service, or attachable TUI.
 - **Package and commands**: publish only the `mastracode/` workspace as `@srdjancoric/mastracode-telegram`; `mastracode-telegram --init` prepares isolated state and `mastracode-telegram` starts the stock TUI with Telegram. The official `mastracode` package and executable remain unchanged.
 - **Isolation**: experiment config, state, runtime identity, locks, logs, readiness markers, and Telegram resources are separate from production MastraCode and `mastracode-remote` state and services.
 - **Repository safety**: Mastra work pushes only to `SrdjanCoric/mastra`; bridge work pushes only to `SrdjanCoric/mastracode-remote-telegram`; both original repositories are fetch-only upstream remotes with disabled push URLs.
 - **Skills**: this build discovers skills only from project-local and global `.mastracode/skills` directories.
-- **Routing**: each canonical project maps to one persistent forum topic and permits one Telegram-enabled TUI owner; the topic follows the TUI's active thread.
+- **Routing**: projects share one private forum group, each canonical project maps to one persistent topic, and the broker routes that topic to its one Telegram-enabled TUI owner; the topic follows the TUI's active thread.
 - **Input**: authorized Telegram text enters the native follow-up queue and retains source metadata only in the TUI presentation.
 - **Output**: Telegram receives completed assistant messages and meaningful lifecycle/prompt events, never streaming, tool noise, command output, secrets, or transcripts.
 - **Remote commands**: v1 supports deterministic `/status`, non-terminating `/stop`, and `/help`; model, thread, settings, shell, and privileged controls stay terminal-only.
 - **Prompts**: questions and approvals are prompt-specific, uniquely identified, redacted, answerable from either surface, and never auto-approved.
-- **Recovery**: Telegram failure degrades to local-only operation with bounded retries, persistent offsets/deduplication, bounded prioritized delivery, safe topic recovery, and no replay of unprocessed crash-era instructions.
+- **Recovery**: Telegram or broker failure degrades affected projects to local-only operation with bounded retries, broker-owned offsets/deduplication and prioritized delivery, safe socket/topic recovery, and no replay of unprocessed crash-era instructions.
 - **Implementation source**: reuse behavior from adjacent `mastracode-remote` and its runtime patch, but implement and test TypeScript source rather than compiled artifacts.
-- **Publication**: release requires focused unit/integration tests, TUI end-to-end coverage, isolated package verification, and one manual live Telegram test.
+- **Publication**: release requires focused unit/integration tests, concurrent multi-project broker coverage, TUI end-to-end coverage, isolated package verification, and one manual live Telegram test.
 
 ---
 
 ## Tasks
 
 - [x] 0001 · Establish the isolated Telegram runtime foundation → tasks/done/0001-establish-isolated-telegram-runtime-foundation.md (PR #1, `8a124467`)
-- [~] 0002 · Initialize Telegram for a MastraCode project (after 0001) → tasks/0002-initialize-telegram-for-a-mastracode-project.md
+- [>] 0002 · Initialize Telegram for a MastraCode project (after 0001) → tasks/0002-initialize-telegram-for-a-mastracode-project.md (PR #2)
 - [ ] 0003 · Share one conversation across the TUI and Telegram (after 0002) → tasks/0003-share-one-conversation-across-tui-and-telegram.md
 - [ ] 0004 · Add thread routing and Telegram session commands (after 0003) → tasks/0004-add-thread-routing-and-telegram-session-commands.md
 - [ ] 0005 · Resolve questions and approvals from either surface (after 0004) → tasks/0005-resolve-questions-and-approvals-from-either-surface.md
