@@ -25,6 +25,28 @@ function processNextInlineQuestion(state: TUIState): void {
   }
 }
 
+function redactPromptText(value: string, limit: number): string {
+  return value
+    .replace(/\b(token|secret|password|api[_ -]?key)\s*[:=]\s*\S+/gi, '$1: [redacted]')
+    .trim()
+    .slice(0, limit);
+}
+
+function redactPath(value: string): string {
+  const home = process.env.HOME;
+  const redacted = home && value.startsWith(home) ? `~${value.slice(home.length)}` : value;
+  return redactPromptText(redacted, 500);
+}
+
+function formatQuestionSummary(question: string, options?: Array<{ label: string; description?: string }>): string {
+  const safeQuestion = redactPromptText(question, 1_500) || 'Input requested.';
+  const labels = options
+    ?.map(option => redactPromptText(option.label, 100))
+    .filter(Boolean)
+    .slice(0, 12);
+  return labels?.length ? `${safeQuestion}\nOptions: ${labels.join(', ')}` : safeQuestion;
+}
+
 /**
  * Handle an ask_question event from the ask_user tool.
  * Shows a dialog overlay and resolves the tool's pending promise.
@@ -42,132 +64,108 @@ export async function handleAskQuestion(
   const { state } = ctx;
 
   return new Promise(resolve => {
+    let settled = false;
+    let questionComponent: AskQuestionInlineComponent | undefined;
+    let promptHandle: ReturnType<NonNullable<typeof state.interactivePromptBridge>['present']> | undefined;
+
+    const complete = (resumeData: string | string[], source: 'terminal' | 'telegram') => {
+      if (settled) return;
+      settled = true;
+      if (source === 'telegram' && questionComponent) {
+        questionComponent.answer(Array.isArray(resumeData) ? resumeData.join(', ') : resumeData);
+      }
+      state.activeInlineQuestion = undefined;
+      state.ui.hideOverlay?.();
+      void state.session.respondToToolSuspension({ toolCallId, resumeData });
+      resolve();
+      processNextInlineQuestion(state);
+      state.ui.requestRender();
+    };
+
+    const cancel = () => complete('(skipped)', 'telegram');
+    const resolveLocal = (resumeData: string | string[]) => {
+      if (!promptHandle) {
+        complete(resumeData, 'terminal');
+        return;
+      }
+      promptHandle.resolveLocal(
+        Array.isArray(resumeData) ? { type: 'answers', answers: resumeData } : { type: 'answer', text: resumeData },
+      );
+    };
+
+    const present = () => {
+      promptHandle = state.interactivePromptBridge?.present({
+        kind: 'question',
+        title: 'MastraCode question',
+        summary: formatQuestionSummary(question, options),
+        onResolve: (response, source) => {
+          if (response.type === 'answer') {
+            const resumeData =
+              selectionMode === 'multi_select'
+                ? response.text
+                    .split(',')
+                    .map(value => value.trim())
+                    .filter(Boolean)
+                : response.text;
+            complete(resumeData, source);
+          } else if (response.type === 'answers') {
+            complete(response.answers, source);
+          }
+        },
+        onCancel: cancel,
+      });
+    };
+
     if (state.options.inlineQuestions) {
-      // Look up the streaming component created for THIS tool call. Using the
-      // per-toolCallId map (instead of the single lastAskUserComponent field)
-      // keeps parallel ask_user suspensions bound to their own components so
-      // each question renders distinctly (#13642).
       const askUserComponent = state.pendingAskUserComponents?.get(toolCallId) ?? state.lastAskUserComponent;
       state.pendingAskUserComponents?.delete(toolCallId);
 
       const activate = () => {
         try {
-          let questionComponent: AskQuestionInlineComponent;
-
+          const componentOptions = {
+            question,
+            options,
+            selectionMode,
+            multiline: true,
+            tui: state.ui,
+            onSubmit: (answer: string) => resolveLocal(answer),
+            onSubmitMulti: (answers: string[]) => resolveLocal(answers),
+            onCancel: () => resolveLocal('(skipped)'),
+          };
           if (askUserComponent) {
-            // Activate the existing streaming component with interactive elements.
-            // ask_user is the agent's free-text channel — opt into multiline so users
-            // can paste logs / write paragraph-length replies.
-            askUserComponent.activate({
-              question,
-              options,
-              selectionMode,
-              multiline: true,
-              tui: state.ui,
-              onSubmit: answer => {
-                state.activeInlineQuestion = undefined;
-                state.session.respondToToolSuspension({ toolCallId, resumeData: answer });
-                resolve();
-                processNextInlineQuestion(state);
-              },
-              onSubmitMulti: answers => {
-                state.activeInlineQuestion = undefined;
-                state.session.respondToToolSuspension({ toolCallId, resumeData: answers });
-                resolve();
-                processNextInlineQuestion(state);
-              },
-              onCancel: () => {
-                state.activeInlineQuestion = undefined;
-                state.session.respondToToolSuspension({ toolCallId, resumeData: '(skipped)' });
-                resolve();
-                processNextInlineQuestion(state);
-              },
-            });
+            askUserComponent.activate(componentOptions);
             questionComponent = askUserComponent;
           } else {
-            // Fallback: create a new component if no streaming one exists.
-            // Multiline opt-in matches the streaming branch above.
-            questionComponent = new AskQuestionInlineComponent(
-              {
-                question,
-                options,
-                selectionMode,
-                multiline: true,
-                onSubmit: answer => {
-                  state.activeInlineQuestion = undefined;
-                  state.session.respondToToolSuspension({ toolCallId, resumeData: answer });
-                  resolve();
-                  processNextInlineQuestion(state);
-                },
-                onSubmitMulti: answers => {
-                  state.activeInlineQuestion = undefined;
-                  state.session.respondToToolSuspension({ toolCallId, resumeData: answers });
-                  resolve();
-                  processNextInlineQuestion(state);
-                },
-                onCancel: () => {
-                  state.activeInlineQuestion = undefined;
-                  state.session.respondToToolSuspension({ toolCallId, resumeData: '(skipped)' });
-                  resolve();
-                  processNextInlineQuestion(state);
-                },
-              },
-              state.ui,
-            );
+            questionComponent = new AskQuestionInlineComponent(componentOptions, state.ui);
             state.chatContainer.addChild(questionComponent);
           }
 
-          // Store as active question
           state.activeInlineQuestion = questionComponent;
-
           state.ui.requestRender();
-
-          // Ensure the chat scrolls to show the question
           state.chatContainer.invalidate();
-
-          // Focus the question component
           questionComponent.focused = true;
+          present();
         } catch {
-          // Don't let ask_user errors crash the process — skip the question
-          state.activeInlineQuestion = undefined;
-          state.session.respondToToolSuspension({ toolCallId, resumeData: '(skipped)' });
-          resolve();
-          processNextInlineQuestion(state);
+          complete('(skipped)', 'terminal');
         }
       };
 
-      // If another inline question is already active, queue this one
-      if (state.activeInlineQuestion) {
-        state.pendingInlineQuestions.push(activate);
-      } else {
-        activate();
-      }
+      if (state.activeInlineQuestion) state.pendingInlineQuestions.push(activate);
+      else activate();
     } else {
-      // Dialog mode: Show overlay. Multiline opt-in matches the inline branch.
       const dialog = new AskQuestionDialogComponent({
         question,
         options,
         selectionMode,
         multiline: true,
         tui: state.ui,
-        onSubmit: answer => {
-          state.ui.hideOverlay();
-          state.session.respondToToolSuspension({ toolCallId, resumeData: answer });
-          resolve();
-        },
-        onSubmitMulti: answers => {
-          state.ui.hideOverlay();
-          state.session.respondToToolSuspension({ toolCallId, resumeData: answers });
-          resolve();
-        },
-        onCancel: () => {
-          state.ui.hideOverlay();
-          state.session.respondToToolSuspension({ toolCallId, resumeData: '(skipped)' });
-          resolve();
-        },
+        onSubmit: answer => resolveLocal(answer),
+        onSubmitMulti: answers => resolveLocal(answers),
+        onCancel: () => resolveLocal('(skipped)'),
       });
       showModalOverlay(state.ui, dialog, { widthPercent: 0.7 });
       dialog.focused = true;
+      present();
     }
 
     ctx.notify('ask_question', question);
@@ -189,33 +187,49 @@ export async function handleSandboxAccessRequest(
 ): Promise<void> {
   const { state } = ctx;
   return new Promise(resolve => {
+    let settled = false;
+    let promptHandle: ReturnType<NonNullable<typeof state.interactivePromptBridge>['present']> | undefined;
+    let questionComponent: AskQuestionInlineComponent;
+
     const firePermissionResult = (decision: 'approved' | 'declined' | 'dismissed') => {
       state.hookManager
         ?.runPermissionResult('sandbox_access', toolCallId, 'request_access', decision, { path: requestedPath, reason })
         .catch(() => {});
     };
+    const complete = (
+      approved: boolean,
+      source: 'terminal' | 'telegram',
+      hookDecision: 'approved' | 'declined' | 'dismissed',
+    ) => {
+      if (settled) return;
+      settled = true;
+      const answer = approved ? 'Yes' : 'No';
+      if (source === 'telegram') questionComponent.answer(answer, !approved);
+      state.activeInlineQuestion = undefined;
+      firePermissionResult(hookDecision);
+      void state.session.respondToToolSuspension({ toolCallId, resumeData: answer });
+      resolve();
+      processNextInlineQuestion(state);
+      state.ui.requestRender();
+    };
+    const resolveLocal = (approved: boolean) => {
+      if (!promptHandle) {
+        complete(approved, 'terminal', approved ? 'approved' : 'declined');
+        return;
+      }
+      promptHandle.resolveLocal({ type: approved ? 'approve' : 'deny' });
+    };
+
     const activate = () => {
-      const questionComponent = new AskQuestionInlineComponent(
+      questionComponent = new AskQuestionInlineComponent(
         {
           question: `Grant sandbox access to "${requestedPath}"?\n${theme.fg('dim', `Reason: ${reason}`)}`,
           options: [
             { label: 'Yes', description: 'Allow access to this directory' },
             { label: 'No', description: 'Deny access' },
           ],
-          onSubmit: answer => {
-            state.activeInlineQuestion = undefined;
-            firePermissionResult(answer.toLowerCase().startsWith('y') ? 'approved' : 'declined');
-            state.session.respondToToolSuspension({ toolCallId, resumeData: answer });
-            resolve();
-            processNextInlineQuestion(state);
-          },
-          onCancel: () => {
-            state.activeInlineQuestion = undefined;
-            firePermissionResult('dismissed');
-            state.session.respondToToolSuspension({ toolCallId, resumeData: 'No' });
-            resolve();
-            processNextInlineQuestion(state);
-          },
+          onSubmit: answer => resolveLocal(answer.toLowerCase().startsWith('y')),
+          onCancel: () => resolveLocal(false),
           formatResult: answer => {
             const approved = answer.toLowerCase().startsWith('y');
             return approved ? `Granted access to ${requestedPath}` : `Denied access to ${requestedPath}`;
@@ -225,22 +239,26 @@ export async function handleSandboxAccessRequest(
         state.ui,
       );
 
-      // Store as active question so input routing works
       state.activeInlineQuestion = questionComponent;
-
-      // Add to chat
       state.chatContainer.addChild(questionComponent);
       questionComponent.focused = true;
       state.ui.requestRender();
       state.chatContainer.invalidate();
+      promptHandle = state.interactivePromptBridge?.present({
+        kind: 'approval',
+        title: 'Sandbox access approval',
+        summary: `Action: grant directory access\nPath: ${redactPath(requestedPath)}\nReason: ${redactPromptText(reason, 500) || 'Not provided'}`,
+        onResolve: (response, source) => {
+          if (response.type === 'approve' || response.type === 'deny') {
+            complete(response.type === 'approve', source, response.type === 'approve' ? 'approved' : 'declined');
+          }
+        },
+        onCancel: () => complete(false, 'telegram', 'dismissed'),
+      });
     };
 
-    // If another inline question is already active, queue this one
-    if (state.activeInlineQuestion) {
-      state.pendingInlineQuestions.push(activate);
-    } else {
-      activate();
-    }
+    if (state.activeInlineQuestion) state.pendingInlineQuestions.push(activate);
+    else activate();
 
     ctx.notify('sandbox_access', `Sandbox access requested: ${requestedPath}`);
   });
@@ -340,96 +358,89 @@ export async function handlePlanApproval(
 
   return new Promise(resolve => {
     const planFilename = snapshotKey;
+    let settled = false;
+    let approvalComponent: PlanApprovalInlineComponent;
+    let promptHandle: ReturnType<NonNullable<typeof state.interactivePromptBridge>['present']> | undefined;
+
     const firePermissionResult = (decision: 'approved' | 'declined') => {
       state.hookManager
         ?.runPermissionResult('plan_approval', toolCallId, 'submit_plan', decision, { path: snapshotKey })
         .catch(() => {});
     };
+    const completeApproval = async (source: 'terminal' | 'telegram', startAsGoal: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (source === 'telegram') approvalComponent.resolveExternally(true);
+      state.activeInlinePlanApproval = undefined;
+      state.ui.setFocus(state.editor);
+      firePermissionResult('approved');
+      await approvePlan(ctx, toolCallId, resolvedTitle, plan, planPath, snapshotKey);
+
+      if (startAsGoal) {
+        const objective = formatPlanGoalObjective(resolvedTitle, plan);
+        await ctx.startGoal(objective, 'Goal cancelled.');
+        const goal = state.goalManager.getGoal();
+        if (goal?.id) state.planStartedGoalId = goal.id;
+      }
+      resolve();
+      state.ui.requestRender();
+    };
+    const completeRejection = (source: 'terminal' | 'telegram') => {
+      if (settled) return;
+      settled = true;
+      if (source === 'telegram') approvalComponent.resolveExternally(false);
+      state.activeInlinePlanApproval = undefined;
+      state.ui.setFocus(state.editor);
+      firePermissionResult('declined');
+      void (async () => {
+        try {
+          await state.session.respondToToolSuspension({
+            toolCallId,
+            resumeData: { action: 'rejected', path: snapshotKey, title: resolvedTitle, plan },
+          });
+        } finally {
+          state.planRejectionAbort = true;
+          state.session.abort();
+        }
+      })();
+      resolve();
+      state.ui.requestRender();
+    };
+    const resolveLocal = (response: 'approve' | 'goal' | 'deny') => {
+      if (!promptHandle) {
+        if (response === 'deny') completeRejection('terminal');
+        else void completeApproval('terminal', response === 'goal');
+        return;
+      }
+      promptHandle.resolveLocal({ type: response });
+    };
+
     const approvalOptions = {
       toolCallId,
       title: resolvedTitle,
       plan,
       planFilename,
       previousPlan,
-      onApprove: async () => {
-        state.activeInlinePlanApproval = undefined;
-        state.ui.setFocus(state.editor);
-        firePermissionResult('approved');
-        await approvePlan(ctx, toolCallId, resolvedTitle, plan, planPath, snapshotKey);
-        resolve();
-      },
-      onGoal: async () => {
-        state.activeInlinePlanApproval = undefined;
-        state.ui.setFocus(state.editor);
-        firePermissionResult('approved');
-        await approvePlan(ctx, toolCallId, resolvedTitle, plan, planPath, snapshotKey);
-
-        // `approvePlan` waits for plan mode to idle before `startGoal` sends
-        // the canonical goal reminder, so this starts a fresh build-mode run.
-        const objective = formatPlanGoalObjective(resolvedTitle, plan);
-        await ctx.startGoal(objective, 'Goal cancelled.');
-
-        const goal = state.goalManager.getGoal();
-        if (goal?.id) {
-          state.planStartedGoalId = goal.id;
-        }
-
-        resolve();
-      },
-      onReject: () => {
-        state.activeInlinePlanApproval = undefined;
-        state.ui.setFocus(state.editor);
-        firePermissionResult('declined');
-        // Resume the tool with a rejection so the rejection result is persisted
-        // in thread history (the next run sees it for context). For submit_plan,
-        // respondToToolSuspension resolves at the resumed tool's `tool_end`
-        // boundary — i.e. once the rejection result has been emitted and the
-        // suspension dropped — but BEFORE the follow-up LLM step runs. We await
-        // that boundary, then abort the run host-side so the model never gets to
-        // generate trailing text. This is deterministic and does not race the
-        // in-loop PlanRejectionAbortProcessor (which remains as a backstop). The
-        // planRejectionAbort flag suppresses the "Interrupted" abort UI so the
-        // transcript stays clean for the user's revision feedback.
-        void (async () => {
-          try {
-            await state.session.respondToToolSuspension({
-              toolCallId,
-              resumeData: { action: 'rejected', path: snapshotKey, title: resolvedTitle, plan },
-            });
-          } finally {
-            state.planRejectionAbort = true;
-            state.session.abort();
-          }
-        })();
-        resolve();
-      },
+      onApprove: () => resolveLocal('approve'),
+      onGoal: () => resolveLocal('goal'),
+      onReject: () => resolveLocal('deny'),
     };
 
-    const approvalComponent =
+    approvalComponent =
       state.lastSubmitPlanComponent instanceof PlanApprovalInlineComponent
         ? state.lastSubmitPlanComponent
         : new PlanApprovalInlineComponent(approvalOptions, state.ui);
     approvalComponent.activate(approvalOptions);
-
-    // Store as active plan approval
     state.activeInlinePlanApproval = approvalComponent;
 
-    // Insert after the submit_plan placeholder; if streaming already created the
-    // plan box, activate that component in place instead of rendering a duplicate.
     if (state.lastSubmitPlanComponent) {
       const children = [...state.chatContainer.children];
       const submitPlanIndex = children.indexOf(state.lastSubmitPlanComponent as any);
       if (submitPlanIndex >= 0) {
         state.chatContainer.clear();
-        for (let i = 0; i <= submitPlanIndex; i++) {
-          state.chatContainer.addChild(children[i]!);
-        }
-        if (state.lastSubmitPlanComponent !== approvalComponent) {
-          state.chatContainer.addChild(approvalComponent);
-        }
-        for (let i = submitPlanIndex + 1; i < children.length; i++) {
-          state.chatContainer.addChild(children[i]!);
-        }
+        for (let i = 0; i <= submitPlanIndex; i++) state.chatContainer.addChild(children[i]!);
+        if (state.lastSubmitPlanComponent !== approvalComponent) state.chatContainer.addChild(approvalComponent);
+        for (let i = submitPlanIndex + 1; i < children.length; i++) state.chatContainer.addChild(children[i]!);
       } else {
         state.chatContainer.addChild(approvalComponent);
       }
@@ -439,6 +450,19 @@ export async function handlePlanApproval(
     state.ui.requestRender();
     state.chatContainer.invalidate();
     state.ui.setFocus(approvalComponent);
+
+    promptHandle = state.interactivePromptBridge?.present({
+      kind: 'approval',
+      title: 'Plan approval',
+      summary: `Action: approve submitted plan\nTitle: ${redactPromptText(resolvedTitle, 300)}\nFile: ${redactPath(planFilename)}`,
+      onResolve: (response, source) => {
+        if (response.type === 'approve' || response.type === 'goal') {
+          return completeApproval(source, response.type === 'goal');
+        }
+        if (response.type === 'deny') completeRejection(source);
+      },
+      onCancel: () => completeRejection('telegram'),
+    });
 
     ctx.notify('plan_approval', `Plan "${resolvedTitle}" requires approval`);
   });

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalPlansDir, getPlanFilename, getSuggestedPlanRelativePath } from '../../../utils/plans.js';
 import { createMockState } from '../../__tests__/agent-controller-mock.js';
 import { PlanApprovalInlineComponent } from '../../components/plan-approval-inline.js';
+import { InteractivePromptBridge } from '../../interactive-prompt-bridge.js';
 import type { TUIState } from '../../state.js';
 import { handleAskQuestion, handlePlanApproval, handleSandboxAccessRequest } from '../prompts.js';
 import type { EventHandlerContext } from '../types.js';
@@ -68,6 +69,13 @@ function createCtx() {
   return { ctx, state, answerQuestion };
 }
 
+function attachInteractivePromptBridge(state: TUIState, id = 'ABC123') {
+  const sendMessage = vi.fn(async (_text: string) => {});
+  const bridge = new InteractivePromptBridge({ sendMessage, idFactory: () => id });
+  state.interactivePromptBridge = bridge;
+  return { bridge, sendMessage };
+}
+
 describe('handleSandboxAccessRequest', () => {
   it('includes the requested path and reason in PermissionResult tool_input', async () => {
     const { ctx, state } = createCtx();
@@ -82,6 +90,27 @@ describe('handleSandboxAccessRequest', () => {
       path: '/tmp/project',
       reason: 'Read workspace files',
     });
+  });
+
+  it('resolves an authorized Telegram approval through the native suspension API', async () => {
+    const { ctx, state } = createCtx();
+    const { bridge, sendMessage } = attachInteractivePromptBridge(state);
+
+    const promise = handleSandboxAccessRequest(
+      ctx,
+      'sandbox-telegram',
+      `${process.env.HOME}/private/project`,
+      'Read files with token=top-secret',
+    );
+    await bridge.receiveMessage('ABC123 approve');
+    await promise;
+
+    expect(state.session.respondToToolSuspension).toHaveBeenCalledWith({
+      toolCallId: 'sandbox-telegram',
+      resumeData: 'Yes',
+    });
+    expect(sendMessage.mock.calls[0]?.[0]).toContain('Path: ~/private/project');
+    expect(sendMessage.mock.calls[0]?.[0]).not.toContain('top-secret');
   });
 });
 
@@ -121,6 +150,23 @@ describe('handleAskQuestion goal mode', () => {
     expect(state.session.respondToToolSuspension).toHaveBeenCalledWith({
       toolCallId: 'q1',
       resumeData: ['React', 'Svelte'],
+    });
+  });
+
+  it('accepts a Telegram answer once and disables the terminal prompt', async () => {
+    const { ctx, state } = createCtx();
+    const { bridge } = attachInteractivePromptBridge(state);
+
+    const promise = handleAskQuestion(ctx, 'q-telegram', 'Which branch?');
+    const component = state.activeInlineQuestion!;
+    await bridge.receiveMessage('ABC123 feature/telegram');
+    component.handleInput('ignored\r');
+    await promise;
+
+    expect(state.session.respondToToolSuspension).toHaveBeenCalledTimes(1);
+    expect(state.session.respondToToolSuspension).toHaveBeenCalledWith({
+      toolCallId: 'q-telegram',
+      resumeData: 'feature/telegram',
     });
   });
 });

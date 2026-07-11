@@ -57,6 +57,7 @@ import { showError, showInfo, showFormattedError, notify } from './display.js';
 import { dispatchEvent } from './event-dispatch.js';
 import { isGoalJudgeInputLocked, showGoalJudgeInputLockInfo } from './goal-input-lock.js';
 import type { EventHandlerContext } from './handlers/types.js';
+import { InteractivePromptBridge } from './interactive-prompt-bridge.js';
 import { askModalQuestion } from './modal-question.js';
 import { showModalOverlay } from './overlay.js';
 import { promptForApiKeyIfNeeded } from './prompt-api-key.js';
@@ -173,6 +174,11 @@ export class MastraTUI {
 
   constructor(options: MastraTUIOptions) {
     this.state = createTUIState(options);
+    if (options.messageBridge) {
+      this.state.interactivePromptBridge = new InteractivePromptBridge({
+        sendMessage: text => options.messageBridge!.sendMessage(text),
+      });
+    }
 
     options.githubSignals?.onSubscriptionsChanged(event => {
       const currentThreadId = this.state.session?.thread?.getId?.();
@@ -568,6 +574,7 @@ export class MastraTUI {
       }
       if (wasActive) {
         this.state.userInitiatedAbort = true;
+        await this.state.interactivePromptBridge?.cancelAll('stopped');
         this.state.pendingApprovalDismiss?.({ reason: 'telegram_stop', message: 'Stopped from Telegram.' });
         this.state.session.abort();
       }
@@ -624,6 +631,8 @@ export class MastraTUI {
     const content = input.text;
     if (!content) return;
 
+    if (await this.state.interactivePromptBridge?.receiveMessage(content)) return;
+
     if (this.state.session.run.isRunning()) {
       this.signalMessage(content, undefined, { label: 'Telegram' });
       return;
@@ -679,6 +688,7 @@ export class MastraTUI {
    * Stop the TUI and clean up.
    */
   stop(): void {
+    void this.state.interactivePromptBridge?.cancelAll('shutdown');
     this.state.options?.messageBridge?.stop();
     this.stopCaffeinate();
 

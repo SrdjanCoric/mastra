@@ -39,6 +39,7 @@ import type { UserMessageComponent } from './components/user-message.js';
 import { showError, showInfo } from './display.js';
 
 import { GoalManager } from './goal-manager.js';
+import type { InteractivePromptBridge } from './interactive-prompt-bridge.js';
 import { getEditorTheme, mastra, TERM_WIDTH_BUFFER } from './theme.js';
 import { VoiceController } from './voice/voice-controller.js';
 
@@ -258,6 +259,8 @@ export interface TUIState {
   pendingSlashCommandMessageIds: string[];
   /** Active approval dialog dismiss callback — called on Ctrl+C or user interruption to unblock the dialog */
   pendingApprovalDismiss: ((context?: { reason?: string; message?: string }) => void) | null;
+  /** Coordinates first-response-wins interactive prompts across terminal and Telegram. */
+  interactivePromptBridge?: InteractivePromptBridge;
 
   // ── Status line ───────────────────────────────────────────────────────
   projectInfo: ProjectInfo;

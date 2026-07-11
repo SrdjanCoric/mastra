@@ -12,11 +12,11 @@ Adapt `mastracode-remote`'s `telegram-wait-bridge` reply parsing, allowed-user/t
 
 ## AFK tasks
 
-- [ ] Add failing tests for question answers, approvals, denials, local-first and Telegram-first races, duplicate delivery, delayed/stale replies, cancellation, shutdown, policy rejection, and agent-end while a decision promise is pending.
-- [ ] Assign unique identities to pending interactions and include only redacted action/risk context in Telegram prompts.
-- [ ] Connect Telegram replies to the same session response APIs used by the TUI and invalidate the losing surface cleanly.
-- [ ] Implement source-level asynchronous approval/suspension policy handling and prevent premature run completion.
-- [ ] Ensure ordinary Telegram text cannot be mistaken for an approval without matching the current prompt identity and scope.
+- [x] Add failing tests for question answers, approvals, denials, local-first and Telegram-first races, duplicate delivery, delayed/stale replies, cancellation, shutdown, policy rejection, and agent-end while a decision promise is pending.
+- [x] Assign unique identities to pending interactions and include only redacted action/risk context in Telegram prompts.
+- [x] Connect Telegram replies to the same session response APIs used by the TUI and invalidate the losing surface cleanly.
+- [x] Implement source-level asynchronous approval/suspension policy handling and prevent premature run completion.
+- [x] Ensure ordinary Telegram text cannot be mistaken for an approval without matching the current prompt identity and scope.
 
 ## Human-in-the-loop tasks
 
@@ -24,9 +24,17 @@ Adapt `mastracode-remote`'s `telegram-wait-bridge` reply parsing, allowed-user/t
 
 ## Acceptance criteria
 
-- [ ] Authorized questions and approvals can be resolved from either surface exactly once.
-- [ ] Sender, private group, project topic, and pending prompt identity must all match.
-- [ ] Delayed, repeated, unauthorized, wrong-topic, and already-resolved replies cannot affect current or later work.
-- [ ] Nothing is automatically approved; ambiguous answers remain answers or receive corrective guidance rather than approval.
-- [ ] Pending asynchronous policy responses keep the run alive and failures surface safely.
-- [ ] Focused policy, session, adapter, and TUI tests plus lint, typecheck, and build pass.
+- [x] Authorized questions and approvals can be resolved from either surface exactly once.
+- [x] Sender, private group, project topic, and pending prompt identity must all match.
+- [x] Delayed, repeated, unauthorized, wrong-topic, and already-resolved replies cannot affect current or later work.
+- [x] Nothing is automatically approved; ambiguous answers remain answers or receive corrective guidance rather than approval.
+- [x] Pending asynchronous policy responses keep the run alive and failures surface safely.
+- [x] Focused policy, session, adapter, and TUI tests plus lint, typecheck, and build pass.
+
+## Implementation log
+
+- Added a prompt coordinator with six-character identities, exact approval/denial parsing, first-response-wins claims, stale/duplicate guidance, and cancellation on stop, shutdown, or thread change.
+- Routed `ask_user`, sandbox access, plan approval, and tool approval responses from Telegram through the same native session APIs as terminal responses; Telegram prompts redact paths/secrets and omit tool arguments.
+- Made headless resolution policies promise-aware and kept runs open while asynchronous approval/suspension decisions are pending.
+- Extended the checked-in `telegram-shared-conversation` TUI scenario to resolve an `ask_user` prompt from Telegram.
+- Verified 9 focused files / 116 tests, package typecheck, package lint, `build:mastracode`, and the focused Telegram TUI e2e scenario.

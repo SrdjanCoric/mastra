@@ -169,6 +169,31 @@ describe('runMC', () => {
     expect(result.toolCalls.map(c => c.name)).toContain('readFile');
   });
 
+  it('waits for an asynchronous approval policy before resuming the native run', async () => {
+    let call = 0;
+    const { controller, session } = await makeHarness({
+      withReadFileTool: true,
+      readFileNeedsApproval: true,
+      doStream: async () => {
+        call++;
+        return { stream: call === 1 ? toolCallStream() : textStream('Approved remotely') };
+      },
+    });
+    const policy: ResolutionPolicy = {
+      onToolApproval: async (): Promise<'approve'> => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return 'approve';
+      },
+      onSuspension: async () => ({ resumeData: 'Yes' }),
+    };
+
+    const result = await runMC({ controller, session, prompt: 'Read test.txt', policy }).result;
+
+    expect(result.status).toBe('completed');
+    expect(result.text).toBe('Approved remotely');
+    expect(result.toolCalls.map(c => c.name)).toContain('readFile');
+  });
+
   it('returns status "aborted" with exit code 1 when aborted', async () => {
     const { controller, session } = await makeHarness({
       doStream: async () => {

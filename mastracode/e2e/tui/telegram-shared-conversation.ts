@@ -59,6 +59,30 @@ export const telegramSharedConversationScenario: McE2eScenario = {
     }
     expect(telegramOutput).toContain('Telegram shared conversation response');
 
+    await deliverTelegramMessage('Ask which Telegram deployment target to use.');
+    await runtime.waitForScreenText(/Which Telegram deployment target should be used\?/i, terminal, 30_000);
+
+    let promptId: string | undefined;
+    for (let attempt = 0; attempt < 50 && !promptId; attempt += 1) {
+      const promptMessage = telegramOutput.find(message => message.includes('Which Telegram deployment target'));
+      promptId = promptMessage?.match(/MastraCode question \(([A-F0-9]{6})\)/)?.[1];
+      if (!promptId) await runtime.sleep(10);
+    }
+    if (!promptId) {
+      throw new Error(`Telegram did not receive the identified ask_user prompt: ${JSON.stringify(telegramOutput)}`);
+    }
+
+    await deliverTelegramMessage(`${promptId} Staging`);
+    await runtime.waitForScreenText(/Telegram selected the staging deployment target\./i, terminal, 30_000);
+    for (
+      let attempt = 0;
+      attempt < 50 && !telegramOutput.includes('Telegram selected the staging deployment target.');
+      attempt += 1
+    ) {
+      await runtime.sleep(10);
+    }
+    expect(telegramOutput).toContain('Telegram selected the staging deployment target.');
+
     terminal.keyCtrlC();
   },
 };
