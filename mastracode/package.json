@@ -7,16 +7,17 @@
     "dist",
     "!dist/web",
     "assets/skills",
+    "README.md",
     "CHANGELOG.md"
   ],
-  "homepage": "https://mastra.ai",
+  "homepage": "https://github.com/SrdjanCoric/mastra/tree/main/mastracode",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mastra-ai/mastra.git",
+    "url": "git+https://github.com/SrdjanCoric/mastra.git",
     "directory": "mastracode"
   },
   "bugs": {
-    "url": "https://github.com/mastra-ai/mastra/issues"
+    "url": "https://github.com/SrdjanCoric/mastra/issues"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
