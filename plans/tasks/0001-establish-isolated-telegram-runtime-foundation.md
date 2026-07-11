@@ -10,15 +10,22 @@ Create the smallest complete CLI/runtime foundation for the separately published
 
 ## AFK tasks
 
-- [ ] Add failing tests for the separate package/bin identity, `--init` routing, unchanged official invocation, isolated runtime paths, and MastraCode-only skill discovery.
-- [ ] Add the `mastracode-telegram` command-mode boundary and isolated configuration/state/runtime identity primitives without starting polling yet.
-- [ ] Port scoped skill path selection from the packaged runtime patch into TypeScript source and remove reliance on compiled patch behavior.
-- [ ] Verify existing non-Telegram skill behavior and all existing CLI modes remain covered and unchanged.
+- [x] Add failing tests for the separate package/bin identity, `--init` routing, unchanged official invocation, isolated runtime paths, and MastraCode-only skill discovery.
+- [x] Add the `mastracode-telegram` command-mode boundary and isolated configuration/state/runtime identity primitives without starting polling yet.
+- [x] Port scoped skill path selection from the packaged runtime patch into TypeScript source and remove reliance on compiled patch behavior.
+- [x] Verify existing non-Telegram skill behavior and all existing CLI modes remain covered and unchanged.
 
 ## Acceptance criteria
 
-- [ ] Only the `mastracode/` workspace is prepared for publication as `@srdjancoric/mastracode-telegram`, exposing `mastracode-telegram --init` and `mastracode-telegram`; an uninitialized run gives a safe actionable error.
-- [ ] The official `mastracode` package, executable, ordinary invocation, and existing specialized modes behave exactly as before.
-- [ ] Telegram experiment paths cannot resolve to production `~/.mastracode-remote/` state or service controls.
-- [ ] Skill discovery for this build includes only `<project>/.mastracode/skills` and `~/.mastracode/skills`, including supported symlink handling.
-- [ ] Focused CLI and skill-path tests plus the MastraCode typecheck pass.
+- [x] Only the `mastracode/` workspace is prepared for publication as `@srdjancoric/mastracode-telegram`, exposing `mastracode-telegram --init` and `mastracode-telegram`; an uninitialized run gives a safe actionable error.
+- [x] The official `mastracode` package, executable, ordinary invocation, and existing specialized modes behave exactly as before.
+- [x] Telegram experiment paths cannot resolve to production `~/.mastracode-remote/` state or service controls.
+- [x] Skill discovery for this build includes only `<project>/.mastracode/skills` and `~/.mastracode/skills`, including supported symlink handling.
+- [x] Focused CLI and skill-path tests plus the MastraCode typecheck pass.
+
+## Implementation log
+
+- Implemented on `feature/isolated-telegram-runtime-foundation`.
+- Added the isolated npm/bin identity, Telegram CLI boundary, readiness guard, runtime path resolver, and source-level MastraCode-only skill scope.
+- Preserved the stock CLI entrypoint and updated package-root detection so existing plugin and headless behavior continues to work in the renamed package.
+- Verified with focused tests, all 1,979 MastraCode unit tests, lint, typecheck, build, invalid-readiness executable smoke tests, and an npm pack metadata/content check.

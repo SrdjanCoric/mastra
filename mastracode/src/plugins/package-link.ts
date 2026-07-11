@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const MASTRACODE_PACKAGE_NAMES = new Set(['mastracode', '@srdjancoric/mastracode-telegram']);
 const MASTRACODE_PACKAGE_ROOT = findMastraCodePackageRoot(path.dirname(fileURLToPath(import.meta.url)));
 
 export function findMastraCodePackageRoot(startDir: string): string {
@@ -11,7 +12,7 @@ export function findMastraCodePackageRoot(startDir: string): string {
     const packageJsonPath = path.join(currentDir, 'package.json');
     if (fs.existsSync(packageJsonPath)) {
       const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8')) as { name?: string };
-      if (packageJson.name === 'mastracode') {
+      if (packageJson.name && MASTRACODE_PACKAGE_NAMES.has(packageJson.name)) {
         return currentDir;
       }
     }

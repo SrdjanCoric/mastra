@@ -100,6 +100,10 @@ export function buildSkillPaths(
   const claudeGlobalSkillsPath = path.join(homeDir, '.claude', 'skills');
   const agentSkillsGlobalPath = path.join(homeDir, '.agents', 'skills');
 
+  if (process.env.MASTRACODE_SKILLS_SCOPE === 'mastracode') {
+    return collectSkillPaths([mastraCodeLocalSkillsPath, mastraCodeGlobalSkillsPath]);
+  }
+
   return collectSkillPaths([
     mastraCodeLocalSkillsPath,
     claudeLocalSkillsPath,
