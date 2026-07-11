@@ -8,6 +8,8 @@
 
 Complete the operational safety path for Telegram-enabled TUI sessions. Add project ownership locks, persistent update offsets and processed IDs, bounded exponential reconnect behavior, a prioritized bounded outbound queue, safe deleted-topic handling, crash-era instruction reporting, health notices, and redacted diagnostics. Telegram failures must never take down or block the local TUI.
 
+Reuse the proven Telegram error classification, update-offset handling, processed-message deduplication, deleted-topic detection, and redaction rules from `mastracode-remote` where they fit. Adapt them to a TUI-owned process with local-only degradation and no launchd daemon, workflow service, or replay of instructions from a previous TUI process.
+
 ## AFK tasks
 
 - [ ] Add deterministic failing tests using fake time and storage for disconnect/reconnect, rate limits, malformed responses, duplicate/out-of-order updates, stale offsets, queue overflow, topic deletion, concurrent owners, stale locks, crashes, and redacted logging.

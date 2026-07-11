@@ -8,6 +8,8 @@
 
 Implement the first complete `mastracode-telegram` happy path. The normal TUI must render and remain fully interactive while an in-process Telegram adapter polls the initialized project topic. Authorized Telegram text enters the active session's native follow-up queue, appears in the TUI with source metadata, and reaches the model unchanged. Every completed assistant message is delivered to Telegram regardless of which surface supplied the input.
 
+Adapt the proven `mastracode-remote` `TelegramBotClient` and `telegram-update-poller` transport/filtering behavior for in-process TUI ownership, including update polling, group/user/topic filtering, message splitting, and outbound delivery. Reuse behavior, but connect it directly to the native controller/session rather than the remote workflow daemon or headless runtime.
+
 ## AFK tasks
 
 - [ ] Add failing adapter and TUI integration tests for startup, authorized text, active-turn queueing, idle delivery, source presentation, assistant completion delivery, long-message splitting, unsupported attachments, and clean shutdown.

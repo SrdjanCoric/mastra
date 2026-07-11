@@ -6,7 +6,7 @@
 
 ## What to build
 
-Implement `mastracode-telegram --init` as an isolated, idempotent setup flow adapted from the adjacent remote bridge. It must validate MastraCode readiness, Git and GitHub prerequisites, Telegram credentials and authorization scope, install or verify workflow skills, map the canonical project to one forum topic, persist non-production readiness state, and complete an end-to-end Telegram connectivity test. It must not install or control launchd.
+Implement `mastracode-telegram --init` as an isolated, idempotent, user-friendly setup flow adapted from the adjacent remote bridge. It must confirm the selected project, guide interactive users through missing Telegram settings with hidden token input, reuse saved configuration on rerun, validate MastraCode readiness, Git and GitHub prerequisites, Telegram credentials and authorization scope, install or verify workflow skills, map the canonical project to one forum topic, persist non-production readiness state, and complete an end-to-end Telegram connectivity test. It must not install or control launchd.
 
 ## AFK tasks
 
@@ -17,7 +17,7 @@ Implement `mastracode-telegram --init` as an isolated, idempotent setup flow ada
 
 ## Human-in-the-loop tasks
 
-- [ ] [confirm-security] Confirm the implemented credential storage, allowed-user/group/topic authorization boundary, and redaction behavior before the task may merge.
+- [x] [confirm-security] Confirm the implemented credential storage, allowed-user/group/topic authorization boundary, and redaction behavior before the task may merge. Approved by the user after reviewing plaintext local token storage, private-group scope, allowed-user trust, project-path disclosure, managed-skill repair, and revocation/recovery consequences.
 
 ## Acceptance criteria
 
@@ -32,4 +32,5 @@ Implement `mastracode-telegram --init` as an isolated, idempotent setup flow ada
 
 - Implemented on `feature/telegram-project-initialization` with isolated config/state under `~/.mastracode-telegram/` and no service-management code.
 - Added private forum, allowed-user, Git/GitHub, provider-auth, canonical project/topic, managed-skill integrity, and resumable setup validation.
-- Verified 22 focused Telegram tests, MastraCode-only lint/typecheck/build, and package contents including the Telegram executable and bundled workflow skills.
+- Added guided project confirmation, hidden token input, missing-setting prompts, saved-config reuse, progress summaries, and exact next-step guidance adapted from `mastracode-remote`.
+- Verified 26 focused Telegram tests, MastraCode-only lint/typecheck/build, and package contents including the Telegram executable and bundled workflow skills.

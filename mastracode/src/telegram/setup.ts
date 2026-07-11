@@ -108,6 +108,17 @@ function createDefaultDependencies(): TelegramSetupDependencies {
 }
 
 async function loadConfig(env: NodeJS.ProcessEnv, configDir: string): Promise<TelegramRuntimeConfig> {
+  const envBotToken = env.TELEGRAM_BOT_TOKEN?.trim();
+  const envAllowedUserId = env.TELEGRAM_ALLOWED_USER_ID?.trim();
+  const envGroupId = env.TELEGRAM_GROUP_ID?.trim();
+  if (envBotToken && envAllowedUserId && envGroupId) {
+    return {
+      botToken: envBotToken,
+      allowedUserId: parseInteger('TELEGRAM_ALLOWED_USER_ID', envAllowedUserId),
+      groupId: parseInteger('TELEGRAM_GROUP_ID', envGroupId),
+    };
+  }
+
   let saved: { botToken?: string; allowedUserId?: number; groupId?: number } = {};
   try {
     const [settingsRaw, secretsRaw] = await Promise.all([

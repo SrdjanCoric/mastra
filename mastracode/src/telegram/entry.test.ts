@@ -21,6 +21,36 @@ describe('createTelegramCliHandlers', () => {
     expect(importStockCli).not.toHaveBeenCalled();
   });
 
+  it('prints a concise guided setup summary', async () => {
+    const output: string[] = [];
+    const initializeProject = vi.fn().mockResolvedValue({
+      projectPath: '/tmp/project',
+      threadId: 42,
+      reusedTopic: false,
+      recoveredTopic: false,
+      skills: ['mastra-workflow'],
+    });
+    const handlers = createTelegramCliHandlers({
+      homeDir: '/tmp/home',
+      projectPath: '/tmp/project',
+      env: {
+        TELEGRAM_BOT_TOKEN: 'secret-token',
+        TELEGRAM_ALLOWED_USER_ID: '123',
+        TELEGRAM_GROUP_ID: '-100456',
+      },
+      prompter: false,
+      initializeProject,
+      write: message => output.push(message),
+    });
+
+    await handlers.initialize();
+
+    expect(initializeProject).toHaveBeenCalledOnce();
+    expect(output).toContain('Topic: 42 (created)');
+    expect(output).toContain('Next: run `mastracode-telegram` from this project.');
+    expect(output.join('\n')).not.toContain('secret-token');
+  });
+
   it('starts the stock TUI with MastraCode-only skills after setup is ready', async () => {
     const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mastracode-telegram-entry-'));
     const paths = resolveTelegramRuntimePaths(homeDir);
