@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 describe('syncTelegramWorkflowSkills', () => {
-  it('installs missing packaged skills and preserves an existing valid skill', async () => {
+  it('installs missing skills and repairs drift after backing up the existing skill', async () => {
     const homeDir = await temporaryDirectory();
     const sourceDir = await temporaryDirectory();
     for (const name of TELEGRAM_WORKFLOW_SKILLS) {
@@ -32,7 +32,23 @@ describe('syncTelegramWorkflowSkills', () => {
 
     await syncTelegramWorkflowSkills(homeDir, sourceDir);
 
-    expect(await fs.readFile(path.join(existing, 'SKILL.md'), 'utf8')).toBe('# user-managed version\n');
+    expect(await fs.readFile(path.join(existing, 'SKILL.md'), 'utf8')).toBe(`# ${TELEGRAM_WORKFLOW_SKILLS[0]}\n`);
+    expect(
+      await fs.readFile(
+        path.join(
+          homeDir,
+          '.mastracode-telegram',
+          'state',
+          'managed-skill-backups',
+          TELEGRAM_WORKFLOW_SKILLS[0],
+          'SKILL.md',
+        ),
+        'utf8',
+      ),
+    ).toBe('# user-managed version\n');
+    await expect(
+      fs.access(path.join(homeDir, '.mastracode-telegram', 'state', 'managed-skills.json')),
+    ).resolves.toBeUndefined();
     for (const name of TELEGRAM_WORKFLOW_SKILLS) {
       await expect(fs.access(path.join(homeDir, '.mastracode', 'skills', name, 'SKILL.md'))).resolves.toBeUndefined();
     }

@@ -108,33 +108,38 @@ function createDefaultDependencies(): TelegramSetupDependencies {
 }
 
 async function loadConfig(env: NodeJS.ProcessEnv, configDir: string): Promise<TelegramRuntimeConfig> {
-  const values = [env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_ALLOWED_USER_ID, env.TELEGRAM_GROUP_ID];
-  if (values.every(value => value !== undefined && value.trim() !== '')) {
-    return {
-      botToken: env.TELEGRAM_BOT_TOKEN as string,
-      allowedUserId: parseInteger('TELEGRAM_ALLOWED_USER_ID', env.TELEGRAM_ALLOWED_USER_ID as string),
-      groupId: parseInteger('TELEGRAM_GROUP_ID', env.TELEGRAM_GROUP_ID as string),
-    };
-  }
-
+  let saved: { botToken?: string; allowedUserId?: number; groupId?: number } = {};
   try {
     const [settingsRaw, secretsRaw] = await Promise.all([
       fs.readFile(path.join(configDir, 'settings.json'), 'utf8'),
       fs.readFile(path.join(configDir, 'secrets.json'), 'utf8'),
     ]);
-    const settings = JSON.parse(settingsRaw) as { allowedUserId: number; groupId: number };
-    const secrets = JSON.parse(secretsRaw) as { botToken: string };
-    return { botToken: secrets.botToken, allowedUserId: settings.allowedUserId, groupId: settings.groupId };
-  } catch {
-    const missing = [
-      ['TELEGRAM_BOT_TOKEN', env.TELEGRAM_BOT_TOKEN],
-      ['TELEGRAM_ALLOWED_USER_ID', env.TELEGRAM_ALLOWED_USER_ID],
-      ['TELEGRAM_GROUP_ID', env.TELEGRAM_GROUP_ID],
-    ]
-      .filter(([, value]) => value === undefined || value.trim() === '')
-      .map(([name]) => name);
-    throw new Error(`Missing required Telegram config: ${missing.join(', ')}`);
+    const settings = JSON.parse(settingsRaw) as { allowedUserId?: number; groupId?: number };
+    const secrets = JSON.parse(secretsRaw) as { botToken?: string };
+    saved = { ...settings, ...secrets };
+  } catch (error) {
+    if (!isMissingPathError(error)) {
+      throw new Error('Saved Telegram configuration is invalid. Remove the isolated config and rerun init.');
+    }
   }
+
+  const botToken = env.TELEGRAM_BOT_TOKEN?.trim() || saved.botToken;
+  const allowedUserId = env.TELEGRAM_ALLOWED_USER_ID?.trim() || saved.allowedUserId?.toString();
+  const groupId = env.TELEGRAM_GROUP_ID?.trim() || saved.groupId?.toString();
+  const missing = [
+    ['TELEGRAM_BOT_TOKEN', botToken],
+    ['TELEGRAM_ALLOWED_USER_ID', allowedUserId],
+    ['TELEGRAM_GROUP_ID', groupId],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+  if (missing.length > 0) throw new Error(`Missing required Telegram config: ${missing.join(', ')}`);
+
+  return {
+    botToken: botToken as string,
+    allowedUserId: parseInteger('TELEGRAM_ALLOWED_USER_ID', allowedUserId as string),
+    groupId: parseInteger('TELEGRAM_GROUP_ID', groupId as string),
+  };
 }
 
 async function saveConfig(configDir: string, config: TelegramRuntimeConfig): Promise<void> {
