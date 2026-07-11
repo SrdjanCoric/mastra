@@ -2157,6 +2157,9 @@ importers:
       '@aws-sdk/credential-providers':
         specifier: ^3.864.0
         version: 3.1006.0
+      '@clack/prompts':
+        specifier: ^1.7.0
+        version: 1.7.0
       '@earendil-works/pi-tui':
         specifier: ^0.79.4
         version: 0.79.4

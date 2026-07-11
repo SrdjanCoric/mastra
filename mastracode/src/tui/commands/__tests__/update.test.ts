@@ -68,6 +68,8 @@ async function flushPromises(times = 4) {
 
 describe('handleUpdateCommand', () => {
   beforeEach(() => {
+    delete process.env.MASTRACODE_DISABLE_UPDATE_CHECK;
+    delete process.env.MASTRACODE_TELEGRAM_ENABLED;
     vi.clearAllMocks();
     fetchLatestVersionMock.mockResolvedValue('0.2.0');
     fetchChangelogMock.mockResolvedValue('  • New thing');
@@ -76,6 +78,19 @@ describe('handleUpdateCommand', () => {
     runUpdateMock.mockResolvedValue(false);
     getInstallCommandMock.mockReturnValue('pnpm add -g mastracode@0.2.0');
     loadSettingsMock.mockReturnValue({ updateDismissedVersion: null });
+  });
+
+  it('does not offer upstream MastraCode updates for the Telegram distribution', async () => {
+    process.env.MASTRACODE_TELEGRAM_ENABLED = '1';
+    const ctx = createCtx();
+
+    await handleUpdateCommand(ctx);
+
+    expect(ctx.showInfo).toHaveBeenCalledWith(
+      'Updates for this distribution are managed through @srdjancoric/mastracode-telegram.',
+    );
+    expect(fetchLatestVersionMock).not.toHaveBeenCalled();
+    expect(ctx.state.chatContainer.addChild).not.toHaveBeenCalled();
   });
 
   it('reports registry failure without opening an inline update prompt', async () => {

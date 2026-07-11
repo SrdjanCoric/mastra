@@ -643,26 +643,9 @@ export class MastraTUI {
       return;
     }
 
-    const messageId = `telegram-user-${Date.now()}`;
-    addUserMessage(
-      this.state,
-      {
-        id: messageId,
-        role: 'user',
-        content: [{ type: 'text', text: content }],
-        createdAt: new Date(),
-      },
-      { label: 'Telegram' },
-    );
-    this.state.ui.requestRender();
-
     const allowed = await this.runUserPromptHook(content);
     if (!allowed) return;
-    if (this.state.pendingNewThread) {
-      await this.state.session.thread.create();
-      this.state.pendingNewThread = false;
-    }
-    this.fireMessage(content);
+    this.signalMessage(content, undefined, { label: 'Telegram' });
   }
 
   private queueFollowUpMessage(text: string): void {
@@ -1751,7 +1734,7 @@ export class MastraTUI {
    * @param passive When true, only show an info message (used for periodic rechecks).
    */
   private async checkForUpdate(passive = false): Promise<void> {
-    if (process.env.MASTRACODE_DISABLE_UPDATE_CHECK === '1') return;
+    if (process.env.MASTRACODE_DISABLE_UPDATE_CHECK === '1' || process.env.MASTRACODE_TELEGRAM_ENABLED === '1') return;
 
     const currentVersion = this.state.options.version;
     if (!currentVersion) return;

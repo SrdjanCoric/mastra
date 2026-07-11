@@ -15,10 +15,6 @@ async function temporaryProject(): Promise<string> {
   return directory;
 }
 
-function createPrompter(...answers: string[]) {
-  return { ask: vi.fn(async () => answers.shift() ?? '') };
-}
-
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map(directory => fs.rm(directory, { recursive: true, force: true })),
@@ -43,11 +39,20 @@ describe('prepareGuidedProjectRepository', () => {
       if (invocation === 'git config user.name' || invocation === 'git config user.email') return '';
       if (invocation.startsWith('git config user.')) return '';
       if (invocation === 'git remote -v' || invocation === 'git remote') return '';
+      if (invocation === 'gh --version') return 'gh version 2';
       if (invocation === 'gh auth status') return 'authenticated';
       if (invocation.startsWith('gh repo create')) return '';
       throw new Error(`Unexpected command: ${invocation}`);
     });
-    const prompter = createPrompter('', 'Test User', 'test@example.com', '', 'tracker', '');
+    const prompter = {
+      ask: vi
+        .fn()
+        .mockResolvedValueOnce('Test User')
+        .mockResolvedValueOnce('test@example.com')
+        .mockResolvedValueOnce('tracker'),
+      confirm: vi.fn().mockResolvedValue(true),
+      choose: vi.fn().mockResolvedValue('private'),
+    };
     const output: string[] = [];
 
     await expect(
@@ -59,6 +64,20 @@ describe('prepareGuidedProjectRepository', () => {
       }),
     ).resolves.toBe(canonicalPath);
 
+    expect(prompter.confirm).toHaveBeenNthCalledWith(
+      1,
+      'This directory is not a Git repository. Initialize it now?',
+      true,
+    );
+    expect(prompter.confirm).toHaveBeenNthCalledWith(2, 'No GitHub remote is configured. Create one now?', true);
+    expect(prompter.choose).toHaveBeenCalledWith(
+      'GitHub repository visibility',
+      [
+        { value: 'private', label: 'Private', hint: 'Only you and invited collaborators can access it' },
+        { value: 'public', label: 'Public', hint: 'Anyone can view it' },
+      ],
+      'private',
+    );
     expect(runner).toHaveBeenCalledWith('git', ['init'], projectPath);
     expect(runner).toHaveBeenCalledWith('git', ['config', 'user.name', 'Test User'], canonicalPath);
     expect(runner).toHaveBeenCalledWith('git', ['config', 'user.email', 'test@example.com'], canonicalPath);
@@ -79,14 +98,27 @@ describe('prepareGuidedProjectRepository', () => {
       if (invocation === 'git config user.name') return 'Test User';
       if (invocation === 'git config user.email') return 'test@example.com';
       if (invocation === 'git remote -v' || invocation === 'git remote') return '';
+      if (invocation === 'gh --version') return 'gh version 2';
       if (invocation === 'gh auth status') return 'authenticated';
       if (invocation.startsWith('gh repo create')) return '';
       throw new Error(`Unexpected command: ${invocation}`);
     });
-    const prompter = createPrompter('', 'tracker-web', 'public');
+    const prompter = {
+      ask: vi.fn().mockResolvedValue('tracker-web'),
+      confirm: vi.fn().mockResolvedValue(true),
+      choose: vi.fn().mockResolvedValue('public'),
+    };
 
     await prepareGuidedProjectRepository({ projectPath, prompter, write: vi.fn(), runner });
 
+    expect(prompter.choose).toHaveBeenCalledWith(
+      'GitHub repository visibility',
+      expect.arrayContaining([
+        expect.objectContaining({ value: 'private', label: 'Private' }),
+        expect.objectContaining({ value: 'public', label: 'Public' }),
+      ]),
+      'private',
+    );
     expect(runner).toHaveBeenCalledWith(
       'gh',
       ['repo', 'create', 'tracker-web', '--public', '--source', canonicalPath, '--remote', 'origin'],

@@ -3,7 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
+import { chooseInitChoice, confirmInitChoice } from './guided-init.js';
 import type { TelegramInitPrompter } from './guided-init.js';
+import { githubAuthInstructions, githubCliInstallInstructions } from './system-checks.js';
 import type { SystemCommandRunner } from './system-checks.js';
 
 const execFileAsync = promisify(execFile);
@@ -19,9 +21,9 @@ export async function prepareGuidedProjectRepository(options: {
   let repositoryRoot = await detectRepositoryRoot(options.projectPath, runner);
 
   if (!repositoryRoot) {
-    const initialize = await confirm(
+    const initialize = await confirmInitChoice(
       options.prompter,
-      'This directory is not a Git repository. Initialize it now? [Y/n]: ',
+      'This directory is not a Git repository. Initialize it now?',
     );
     if (!initialize) throw new Error('Git repository setup was cancelled.');
     await runner('git', ['init'], options.projectPath);
@@ -36,28 +38,30 @@ export async function prepareGuidedProjectRepository(options: {
   const remotes = await runner('git', ['remote', '-v'], canonicalPath);
   if (/(?:git@github\.com:|https:\/\/github\.com\/)/.test(remotes)) return canonicalPath;
 
-  const create = await confirm(
-    options.prompter,
-    'No GitHub remote is configured. Create a GitHub repository now? [Y/n]: ',
-  );
+  const create = await confirmInitChoice(options.prompter, 'No GitHub remote is configured. Create one now?');
   if (!create) throw new Error('A GitHub remote is required to initialize MastraCode Telegram.');
 
+  if (!(await optionalCommand(runner, 'gh', ['--version'], canonicalPath))) {
+    throw new Error(githubCliInstallInstructions());
+  }
   try {
     await runner('gh', ['auth', 'status'], canonicalPath);
   } catch {
-    throw new Error('GitHub authentication is missing. Run `gh auth login`, then rerun init.');
+    throw new Error(githubAuthInstructions());
   }
 
   const defaultName = path.basename(canonicalPath);
   const repositoryName =
     (await options.prompter.ask(`GitHub repository name [${defaultName}]: `)).trim() || defaultName;
-  const visibilityAnswer = (
-    await options.prompter.ask('GitHub repository visibility, private or public [private]: ')
-  ).toLowerCase();
-  const visibility = visibilityAnswer || 'private';
-  if (visibility !== 'private' && visibility !== 'public') {
-    throw new Error('GitHub repository visibility must be `private` or `public`.');
-  }
+  const visibility = await chooseInitChoice(
+    options.prompter,
+    'GitHub repository visibility',
+    [
+      { value: 'private', label: 'Private', hint: 'Only you and invited collaborators can access it' },
+      { value: 'public', label: 'Public', hint: 'Anyone can view it' },
+    ],
+    'private',
+  );
 
   const remoteNames = await runner('git', ['remote'], canonicalPath);
   const remoteName = remoteNames.split(/\s+/).includes('origin') ? 'github' : 'origin';
@@ -103,11 +107,6 @@ async function optionalCommand(
   } catch {
     return undefined;
   }
-}
-
-async function confirm(prompter: TelegramInitPrompter, question: string): Promise<boolean> {
-  const answer = (await prompter.ask(question)).trim();
-  return answer === '' || /^[Yy]/.test(answer);
 }
 
 async function run(command: string, args: string[], cwd?: string): Promise<string> {
