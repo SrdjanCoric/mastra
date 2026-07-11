@@ -218,7 +218,10 @@ export function runMC<TState extends Record<string, unknown>>(options: RunMCOpti
   function trackPolicyResolution(resolution: Promise<void>): void {
     pendingPolicyResolutions.add(resolution);
     void resolution
-      .catch(err => fail(`Resolution policy failed: ${(err as Error).message}`))
+      .catch(err => {
+        session.abort();
+        fail(`Resolution policy failed: ${(err as Error).message}`);
+      })
       .finally(() => {
         pendingPolicyResolutions.delete(resolution);
         if (pendingAgentEndReason && pendingPolicyResolutions.size === 0) {

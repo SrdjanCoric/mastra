@@ -194,6 +194,27 @@ describe('runMC', () => {
     expect(result.toolCalls.map(c => c.name)).toContain('readFile');
   });
 
+  it('aborts the session and reports an asynchronous policy failure', async () => {
+    const { controller, session } = await makeHarness({
+      withReadFileTool: true,
+      readFileNeedsApproval: true,
+      doStream: async () => ({ stream: toolCallStream() }),
+    });
+    const abort = vi.spyOn(session, 'abort');
+    const policy: ResolutionPolicy = {
+      onToolApproval: async () => {
+        throw new Error('remote approval unavailable');
+      },
+      onSuspension: () => ({ resumeData: 'Yes' }),
+    };
+
+    const result = await runMC({ controller, session, prompt: 'Read test.txt', policy }).result;
+
+    expect(result.status).toBe('error');
+    expect(result.error?.message).toContain('remote approval unavailable');
+    expect(abort).toHaveBeenCalled();
+  });
+
   it('returns status "aborted" with exit code 1 when aborted', async () => {
     const { controller, session } = await makeHarness({
       doStream: async () => {

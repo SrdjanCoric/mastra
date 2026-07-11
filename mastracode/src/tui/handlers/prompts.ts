@@ -247,7 +247,7 @@ export async function handleSandboxAccessRequest(
       promptHandle = state.interactivePromptBridge?.present({
         kind: 'approval',
         title: 'Sandbox access approval',
-        summary: `Action: grant directory access\nPath: ${redactPath(requestedPath)}\nReason: ${redactPromptText(reason, 500) || 'Not provided'}`,
+        summary: `Action: grant directory access\nPath: ${redactPath(requestedPath)}\nReason details are available only in the terminal.`,
         onResolve: (response, source) => {
           if (response.type === 'approve' || response.type === 'deny') {
             complete(response.type === 'approve', source, response.type === 'approve' ? 'approved' : 'declined');
