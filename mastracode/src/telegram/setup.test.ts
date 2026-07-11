@@ -35,6 +35,7 @@ function createDependencies(overrides: Partial<TelegramSetupDependencies> = {}):
       validateAuthorization: vi.fn().mockResolvedValue(undefined),
       createForumTopic: vi.fn().mockResolvedValue({ threadId: 42 }),
       sendMessage: vi.fn().mockResolvedValue(undefined),
+      verifyRoundTrip: vi.fn().mockResolvedValue(undefined),
     }),
     now: () => new Date('2026-07-11T20:00:00.000Z'),
     ...overrides,
@@ -93,12 +94,16 @@ describe('initializeTelegramProject', () => {
     const sendMessage = vi
       .fn()
       .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('Bad Request: message thread not found'))
       .mockResolvedValue(undefined);
     const createForumTopic = vi.fn().mockResolvedValueOnce({ threadId: 42 }).mockResolvedValueOnce({ threadId: 84 });
     const dependencies = createDependencies({
-      createTelegramClient: vi.fn().mockReturnValue({ validateAuthorization: vi.fn(), createForumTopic, sendMessage }),
+      createTelegramClient: vi.fn().mockReturnValue({
+        validateAuthorization: vi.fn(),
+        createForumTopic,
+        sendMessage,
+        verifyRoundTrip: vi.fn(),
+      }),
     });
 
     await initializeTelegramProject({ homeDir, projectPath, env: telegramEnv, dependencies });
@@ -128,6 +133,7 @@ describe('initializeTelegramProject', () => {
             .mockRejectedValue(new Error('Telegram bot cannot access the configured group.')),
           createForumTopic: vi.fn(),
           sendMessage: vi.fn(),
+          verifyRoundTrip: vi.fn(),
         }),
       },
     ];
@@ -145,6 +151,24 @@ describe('initializeTelegramProject', () => {
       ).rejects.toThrow();
       await expect(fs.access(path.join(homeDir, '.mastracode-telegram', 'state', 'ready.json'))).rejects.toThrow();
     }
+  });
+
+  it('requires the live Telegram round trip before writing readiness', async () => {
+    const homeDir = await makeTemporaryDirectory();
+    const projectPath = await makeTemporaryDirectory();
+    const dependencies = createDependencies({
+      createTelegramClient: vi.fn().mockReturnValue({
+        validateAuthorization: vi.fn(),
+        createForumTopic: vi.fn().mockResolvedValue({ threadId: 42 }),
+        sendMessage: vi.fn(),
+        verifyRoundTrip: vi.fn().mockRejectedValue(new Error('Telegram connectivity test timed out.')),
+      }),
+    });
+
+    await expect(initializeTelegramProject({ homeDir, projectPath, env: telegramEnv, dependencies })).rejects.toThrow(
+      'connectivity test timed out',
+    );
+    await expect(fs.access(path.join(homeDir, '.mastracode-telegram', 'state', 'ready.json'))).rejects.toThrow();
   });
 
   it('resumes after a later GitHub failure using the saved validated credentials', async () => {

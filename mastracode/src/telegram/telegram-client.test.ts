@@ -21,6 +21,39 @@ describe('TelegramBotClient authorization', () => {
     expect(JSON.parse(telegramFetch.mock.calls[2][1].body)).toEqual({ chat_id: -100456, user_id: 123 });
   });
 
+  it('proves outgoing and incoming topic delivery with the allowed user', async () => {
+    let expectedText = '';
+    const telegramFetch = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
+      const method = url.split('/').at(-1);
+      const body = JSON.parse(init.body as string) as { offset?: number; text?: string };
+      if (method === 'getUpdates' && body.offset === -1) {
+        return response([{ update_id: 10 }]);
+      }
+      if (method === 'getUpdates') {
+        return response([
+          {
+            update_id: 11,
+            message: {
+              message_thread_id: 42,
+              text: expectedText,
+              chat: { id: -100456 },
+              from: { id: 123 },
+            },
+          },
+        ]);
+      }
+      if (method === 'sendMessage' && body.text?.includes('Reply in this topic with exactly:')) {
+        expectedText = body.text.split('exactly: ')[1] ?? '';
+      }
+      return response({});
+    });
+
+    await new TelegramBotClient(config, telegramFetch).verifyRoundTrip(42);
+
+    expect(expectedText).toMatch(/^verify [A-F0-9]{6}$/);
+    expect(telegramFetch).toHaveBeenCalledTimes(5);
+  });
+
   it('rejects invalid credentials without exposing the token', async () => {
     const telegramFetch = vi.fn().mockResolvedValue(response('Unauthorized', false));
 

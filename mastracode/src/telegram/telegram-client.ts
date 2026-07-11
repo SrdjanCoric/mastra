@@ -1,9 +1,11 @@
+import { randomBytes } from 'node:crypto';
 import type { TelegramRuntimeConfig } from './setup.js';
 
 export interface TelegramProjectClient {
   validateAuthorization(): Promise<void>;
   createForumTopic(name: string): Promise<{ threadId: number }>;
   sendMessage(threadId: number, text: string): Promise<void>;
+  verifyRoundTrip(threadId: number): Promise<void>;
 }
 
 export type TelegramFetch = typeof fetch;
@@ -13,6 +15,16 @@ interface TelegramResponse<T> {
   result?: T;
   description?: string;
   parameters?: { migrate_to_chat_id?: number };
+}
+
+interface TelegramUpdate {
+  update_id: number;
+  message?: {
+    message_thread_id?: number;
+    text?: string;
+    chat?: { id?: number };
+    from?: { id?: number };
+  };
 }
 
 export class TelegramBotClient implements TelegramProjectClient {
@@ -86,6 +98,53 @@ export class TelegramBotClient implements TelegramProjectClient {
     }
   }
 
+  async verifyRoundTrip(threadId: number): Promise<void> {
+    const baseline = await this.request<TelegramUpdate[]>('getUpdates', {
+      offset: -1,
+      timeout: 0,
+      allowed_updates: JSON.stringify(['message']),
+    });
+    let offset = nextUpdateOffset(baseline.result ?? []);
+    const code = randomBytes(3).toString('hex').toUpperCase();
+    const expectedText = `verify ${code}`;
+    await this.sendMessage(threadId, `MastraCode connectivity test. Reply in this topic with exactly: ${expectedText}`);
+
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      const updates = await this.request<TelegramUpdate[]>('getUpdates', {
+        ...(offset === undefined ? {} : { offset }),
+        timeout: 5,
+        allowed_updates: JSON.stringify(['message']),
+      });
+      const received = updates.result ?? [];
+      offset = nextUpdateOffset(received) ?? offset;
+      const matched = received.some(update => {
+        const message = update.message;
+        return (
+          message?.chat?.id === this.config.groupId &&
+          message.from?.id === this.config.allowedUserId &&
+          message.message_thread_id === threadId &&
+          message.text?.trim() === expectedText
+        );
+      });
+      if (matched) {
+        if (offset !== undefined) {
+          await this.request<TelegramUpdate[]>('getUpdates', {
+            offset,
+            timeout: 0,
+            allowed_updates: JSON.stringify(['message']),
+          });
+        }
+        await this.sendMessage(threadId, 'MastraCode connectivity test passed. Incoming and outgoing messages work.');
+        return;
+      }
+    }
+
+    throw new Error(
+      `Telegram connectivity test timed out. Reply in project topic ${threadId} from allowed user ${this.config.allowedUserId}, and make sure the bot can read group messages before rerunning init.`,
+    );
+  }
+
   private async request<T = unknown>(
     method: string,
     body: Record<string, string | number>,
@@ -115,6 +174,11 @@ export function splitTelegramMessage(text: string): string[] {
     chunks.push(characters.slice(offset, offset + TELEGRAM_MESSAGE_LIMIT).join(''));
   }
   return chunks.length === 0 ? [''] : chunks;
+}
+
+function nextUpdateOffset(updates: TelegramUpdate[]): number | undefined {
+  if (updates.length === 0) return undefined;
+  return Math.max(...updates.map(update => update.update_id)) + 1;
 }
 
 function formatMigratedGroupMessage(message: string): string {

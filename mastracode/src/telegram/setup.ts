@@ -34,6 +34,7 @@ export interface InitializeTelegramProjectOptions {
   projectPath: string;
   env: NodeJS.ProcessEnv;
   dependencies?: TelegramSetupDependencies;
+  onProgress?: (message: string) => void;
 }
 
 export interface TelegramSetupResult {
@@ -73,10 +74,8 @@ export async function initializeTelegramProject(
   const skills = await dependencies.syncSkills(options.homeDir);
   const topic = await attachProject(paths.stateDir, repository.canonicalPath, telegram);
 
-  await telegram.sendMessage(
-    topic.project.threadId,
-    `MastraCode Telegram setup verified for ${topic.project.displayName}.`,
-  );
+  options.onProgress?.('Telegram: reply to the connectivity test message in the new project topic.');
+  await telegram.verifyRoundTrip(topic.project.threadId);
   await fs.mkdir(paths.stateDir, { recursive: true });
   const checkedAt = dependencies.now().toISOString();
   await saveReadiness(paths.readinessFile, {

@@ -33,4 +33,5 @@ Implement `mastracode-telegram --init` as an isolated, idempotent, user-friendly
 - Implemented on `feature/telegram-project-initialization` with isolated config/state under `~/.mastracode-telegram/` and no service-management code.
 - Added private forum, allowed-user, Git/GitHub, provider-auth, canonical project/topic, managed-skill integrity, and resumable setup validation.
 - Added guided project confirmation, hidden token input, missing-setting prompts, saved-config reuse, progress summaries, and exact next-step guidance adapted from `mastracode-remote`.
-- Verified 26 focused Telegram tests, MastraCode-only lint/typecheck/build, and package contents including the Telegram executable and bundled workflow skills.
+- Adapted the remote bridge connectivity-test pattern so init sends a unique topic challenge, waits for the exact allowed-user reply, confirms the consumed update, and writes readiness only after bidirectional delivery succeeds.
+- Verified 28 focused Telegram tests, MastraCode-only lint/typecheck/build, and package contents including the Telegram executable and bundled workflow skills.

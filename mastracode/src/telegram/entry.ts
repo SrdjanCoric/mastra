@@ -18,6 +18,7 @@ export interface TelegramCliEntryDependencies {
     homeDir: string;
     projectPath: string;
     env: NodeJS.ProcessEnv;
+    onProgress?: (message: string) => void;
   }) => Promise<TelegramSetupResult>;
 }
 
@@ -44,7 +45,12 @@ export function createTelegramCliHandlers(dependencies: TelegramCliEntryDependen
         return;
       }
       write('Validating MastraCode, Git, GitHub, Telegram, and workflow skills...');
-      const result = await initializeProject({ homeDir: resolvedHomeDir, projectPath, env: guided.env });
+      const result = await initializeProject({
+        homeDir: resolvedHomeDir,
+        projectPath,
+        env: guided.env,
+        onProgress: write,
+      });
       write(`Telegram initialized for ${result.projectPath}.`);
       write(`Topic: ${result.threadId}${result.reusedTopic ? ' (reused)' : ' (created)'}`);
       write(`Workflow skills: ${result.skills.length} verified.`);
