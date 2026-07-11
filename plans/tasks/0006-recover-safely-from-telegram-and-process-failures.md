@@ -10,8 +10,11 @@ Complete the operational safety path for Telegram-enabled TUI sessions. Add proj
 
 Extend the Telegram error classification, update-offset handling, processed-message deduplication, deleted-topic detection, and redaction rules already implemented in this codebase. Centralize bot-wide offsets, deduplication, retries, and outbound delivery in the ephemeral broker while keeping follow-up and prompt state inside each TUI. Do not add launchd or a headless workflow-service ownership model, and never replay instructions from a previous broker or TUI process.
 
+The shared TUI and Telegram path already works and is the regression baseline. Before changing recovery code, record the focused tests that prove guided init, broker routing, shared conversation, commands, questions, and approvals. Recovery work must extend those paths, and the baseline tests must continue to pass after each change.
+
 ## AFK tasks
 
+- [ ] Record and run the focused baseline suite for guided init, broker ownership and routing, shared conversation, Telegram commands, questions, and approvals before changing recovery behavior.
 - [ ] Add deterministic failing tests using fake time and storage for broker/client disconnects, broker restart, last-client shutdown, startup races, rate limits, malformed responses, duplicate/out-of-order updates, stale offsets, queue overflow, topic deletion, concurrent project owners, stale sockets/PIDs/locks, crashes, and redacted logging.
 - [ ] Persist only the minimum broker routing/deduplication state required for safe recovery and make offset, processed-ID, socket ownership, and registration writes atomic where corruption would cause duplicate or cross-project control.
 - [ ] Implement bounded exponential backoff and a fair bounded broker outbound queue that discards low-priority notices before completed conversation messages.
@@ -21,6 +24,7 @@ Extend the Telegram error classification, update-offset handling, processed-mess
 
 ## Acceptance criteria
 
+- [ ] Existing guided init, broker routing, shared conversation, Telegram command, question, and approval tests pass without weakened assertions or changed working behavior.
 - [ ] Telegram or broker outages degrade connected projects to local-only operation and recover without restarting their TUIs.
 - [ ] Broker or client reconnection sends one project-scoped recovery notice and current status, without replaying resolved prompts or duplicate messages.
 - [ ] Duplicate, delayed, or out-of-order updates cannot repeat user instructions, cross project topics, or repeat control actions.
