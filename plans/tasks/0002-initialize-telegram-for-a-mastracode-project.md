@@ -10,10 +10,10 @@ Implement `mastracode-telegram --init` as an isolated, idempotent setup flow ada
 
 ## AFK tasks
 
-- [ ] Add failing tests for first setup, rerun/reuse, missing prerequisites, invalid credentials, wrong group/user scope, deleted-topic recovery, secret permissions, and the absence of launchd behavior.
-- [ ] Port the minimum setup, config, project registry, Telegram client, readiness, and managed-skill behavior needed from `mastracode-remote` into the MastraCode source architecture.
-- [ ] Make partial setup failures resumable and report exact corrective actions without leaking credentials.
-- [ ] Add an automated Telegram API seam and isolated end-to-end setup test that cannot touch production runtime paths or resources.
+- [x] Add failing tests for first setup, rerun/reuse, missing prerequisites, invalid credentials, wrong group/user scope, deleted-topic recovery, secret permissions, and the absence of launchd behavior.
+- [x] Port the minimum setup, config, project registry, Telegram client, readiness, and managed-skill behavior needed from `mastracode-remote` into the MastraCode source architecture.
+- [x] Make partial setup failures resumable and report exact corrective actions without leaking credentials.
+- [x] Add an automated Telegram API seam and isolated end-to-end setup test that cannot touch production runtime paths or resources.
 
 ## Human-in-the-loop tasks
 
@@ -21,9 +21,15 @@ Implement `mastracode-telegram --init` as an isolated, idempotent setup flow ada
 
 ## Acceptance criteria
 
-- [ ] Successful init leaves an isolated readiness marker, restrictive secret storage, verified workflow skills, and a persistent canonical-project/topic mapping.
-- [ ] Rerunning setup is idempotent and safely recovers a deleted topic.
-- [ ] Setup validates Git author/repository state and GitHub CLI/remote readiness using actionable errors.
-- [ ] No launchd service is installed, loaded, stopped, or modified.
-- [ ] Automated tests prove production paths and the external production checkout remain untouched.
-- [ ] Focused tests, lint, typecheck, and build pass.
+- [x] Successful init leaves an isolated readiness marker, restrictive secret storage, verified workflow skills, and a persistent canonical-project/topic mapping.
+- [x] Rerunning setup is idempotent and safely recovers a deleted topic.
+- [x] Setup validates Git author/repository state and GitHub CLI/remote readiness using actionable errors.
+- [x] No launchd service is installed, loaded, stopped, or modified.
+- [x] Automated tests prove production paths and the external production checkout remain untouched.
+- [x] Focused tests, lint, typecheck, and build pass.
+
+## Implementation log
+
+- Implemented on `feature/telegram-project-initialization` with isolated config/state under `~/.mastracode-telegram/` and no service-management code.
+- Added private forum, allowed-user, Git/GitHub, provider-auth, canonical project/topic, managed-skill integrity, and resumable setup validation.
+- Verified 22 focused Telegram tests, MastraCode-only lint/typecheck/build, and package contents including the Telegram executable and bundled workflow skills.

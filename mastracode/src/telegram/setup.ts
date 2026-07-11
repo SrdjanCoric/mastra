@@ -243,7 +243,9 @@ async function saveReadiness(
 
 function parseInteger(name: string, value: string): number {
   if (!/^-?\d+$/.test(value)) throw new Error(`${name} must be an integer`);
-  return Number(value);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`${name} must be a safe integer`);
+  return parsed;
 }
 
 function isMissingPathError(error: unknown): boolean {
