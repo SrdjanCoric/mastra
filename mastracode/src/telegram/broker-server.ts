@@ -35,10 +35,22 @@ export async function startTelegramBrokerServer(options: {
     const clientId = randomUUID();
     let registered = false;
     const send = (message: TelegramBrokerServerMessage) => socket.write(encodeBrokerMessage(message));
-    const parse = createBrokerMessageParser<TelegramBrokerClientMessage>(message => {
+    const rejectInvalidMessage = () => {
+      send({ version: 1, type: 'error', message: 'Invalid Telegram broker message.' });
+      socket.destroySoon();
+    };
+    const parse = createBrokerMessageParser<unknown>(message => {
+      if (!isRecord(message) || typeof message.version !== 'number') {
+        rejectInvalidMessage();
+        return;
+      }
       if (message.version !== TELEGRAM_BROKER_PROTOCOL_VERSION) {
         send({ version: 1, type: 'error', message: 'Unsupported Telegram broker protocol version.' });
         socket.destroy();
+        return;
+      }
+      if (!isTelegramBrokerClientMessage(message)) {
+        rejectInvalidMessage();
         return;
       }
       if (message.type === 'register') {
@@ -91,7 +103,7 @@ export async function startTelegramBrokerServer(options: {
           });
         },
       );
-    });
+    }, rejectInvalidMessage);
     socket.on('data', parse);
     socket.on('close', () => {
       options.broker.unregister(clientId);
@@ -126,4 +138,28 @@ export async function startTelegramBrokerServer(options: {
   await fs.chmod(options.socketPath, 0o600);
 
   return { done, close, isClosed: () => closed };
+}
+
+function isTelegramBrokerClientMessage(message: unknown): message is TelegramBrokerClientMessage {
+  if (!isRecord(message) || message.version !== TELEGRAM_BROKER_PROTOCOL_VERSION || typeof message.type !== 'string') {
+    return false;
+  }
+  if (message.type === 'register') {
+    return (
+      isRecord(message.registration) &&
+      typeof message.registration.projectPath === 'string' &&
+      Number.isSafeInteger(message.registration.threadId)
+    );
+  }
+  if (message.type === 'send') {
+    return typeof message.requestId === 'string' && typeof message.text === 'string';
+  }
+  if (message.type === 'verify') {
+    return typeof message.requestId === 'string' && Number.isSafeInteger(message.threadId);
+  }
+  return false;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

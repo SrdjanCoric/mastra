@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { verifyTelegramRoundTripThroughBroker } from './broker-client.js';
+import { acquireTelegramBrokerLock } from './broker-lock.js';
 import { TELEGRAM_READINESS_SCHEMA_VERSION } from './readiness.js';
 import { resolveTelegramBrokerPaths, resolveTelegramRuntimePaths } from './runtime-paths.js';
 import { syncTelegramWorkflowSkills } from './skills.js';
@@ -84,7 +85,18 @@ export async function initializeTelegramProject(
     });
   } catch (error) {
     if (!isMissingBrokerError(error)) throw error;
-    await telegram.verifyRoundTrip(topic.project.threadId);
+    await fs.mkdir(paths.runtimeDir, { recursive: true, mode: 0o700 });
+    const lock = await acquireTelegramBrokerLock(brokerPaths.lockPath);
+    if (lock) {
+      try {
+        await telegram.verifyRoundTrip(topic.project.threadId);
+      } finally {
+        await lock.close();
+        await fs.rm(brokerPaths.lockPath, { force: true });
+      }
+    } else {
+      await verifyBrokerAfterStartup(brokerPaths.socketPath, topic.project.threadId);
+    }
   }
   await fs.mkdir(paths.stateDir, { recursive: true });
   const checkedAt = dependencies.now().toISOString();
@@ -262,6 +274,18 @@ async function saveReadiness(
     `${JSON.stringify({ schemaVersion: TELEGRAM_READINESS_SCHEMA_VERSION, projects: [...next, marker] }, null, 2)}\n`,
     'utf8',
   );
+}
+
+async function verifyBrokerAfterStartup(socketPath: string, threadId: number): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      await verifyTelegramRoundTripThroughBroker({ socketPath, threadId });
+      return;
+    } catch (error) {
+      if (!isMissingBrokerError(error) || attempt === 19) throw error;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
 }
 
 function parseInteger(name: string, value: string): number {

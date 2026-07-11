@@ -18,7 +18,10 @@ export function encodeBrokerMessage(message: TelegramBrokerClientMessage | Teleg
   return `${JSON.stringify(message)}\n`;
 }
 
-export function createBrokerMessageParser<T>(onMessage: (message: T) => void): (chunk: Buffer) => void {
+export function createBrokerMessageParser<T>(
+  onMessage: (message: T) => void,
+  onError: (error: Error) => void = () => {},
+): (chunk: Buffer) => void {
   let buffered = '';
   return chunk => {
     buffered += chunk.toString('utf8');
@@ -26,7 +29,13 @@ export function createBrokerMessageParser<T>(onMessage: (message: T) => void): (
     while (newline >= 0) {
       const line = buffered.slice(0, newline);
       buffered = buffered.slice(newline + 1);
-      if (line.trim()) onMessage(JSON.parse(line) as T);
+      if (line.trim()) {
+        try {
+          onMessage(JSON.parse(line) as T);
+        } catch (error) {
+          onError(error instanceof Error ? error : new Error(String(error)));
+        }
+      }
       newline = buffered.indexOf('\n');
     }
   };

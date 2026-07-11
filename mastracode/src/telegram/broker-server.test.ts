@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -26,6 +27,21 @@ async function waitFor(check: () => boolean): Promise<void> {
 }
 
 describe('Telegram broker socket', () => {
+  it('rejects malformed IPC without crashing the broker', async () => {
+    const socketPath = await createSocketPath();
+    const telegram = { getTextUpdates: vi.fn(async () => []), sendMessage: vi.fn(async () => {}) };
+    const broker = new TelegramBroker({ allowedUserId: 42, telegram });
+    const server = await startTelegramBrokerServer({ socketPath, broker, shutdownGraceMs: 5 });
+    const response = await new Promise<string>((resolve, reject) => {
+      const socket = net.createConnection(socketPath, () => socket.write('{not json}\n'));
+      socket.once('data', chunk => resolve(chunk.toString('utf8')));
+      socket.once('error', reject);
+    });
+
+    expect(response).toContain('Invalid Telegram broker message.');
+    await server.done;
+  });
+
   it('uses the active broker poller for setup verification', async () => {
     const socketPath = await createSocketPath();
     const telegram = {

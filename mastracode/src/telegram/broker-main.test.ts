@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { acquireTelegramBrokerLock } from './broker-main.js';
+import { acquireTelegramBrokerLock } from './broker-lock.js';
 
 const cleanupPaths: string[] = [];
 afterEach(async () => {
