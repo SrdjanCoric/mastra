@@ -1,8 +1,10 @@
+import type { TUIBridgeIncomingMessage } from '../../src/tui/state.js';
 import { expect } from './expect.js';
 import type { McE2eScenario } from './types.js';
 
-let deliverTelegramMessage: ((text: string) => Promise<void>) | undefined;
+let deliverTelegramMessage: ((message: TUIBridgeIncomingMessage) => Promise<void>) | undefined;
 let telegramOutput: string[] = [];
+let lastPromptMessageId: number | undefined;
 
 export const telegramSharedConversationScenario: McE2eScenario = {
   name: 'telegram-shared-conversation',
@@ -13,6 +15,7 @@ export const telegramSharedConversationScenario: McE2eScenario = {
   inProcessApp({ startMastraCodeApp }) {
     telegramOutput = [];
     deliverTelegramMessage = undefined;
+    lastPromptMessageId = undefined;
     return startMastraCodeApp({
       tui: {
         messageBridge: {
@@ -21,6 +24,11 @@ export const telegramSharedConversationScenario: McE2eScenario = {
           },
           async sendMessage(text) {
             telegramOutput.push(text);
+          },
+          async sendPrompt(prompt) {
+            lastPromptMessageId = 101;
+            telegramOutput.push(`${prompt.title}\n${prompt.summary}`);
+            return { messageId: lastPromptMessageId };
           },
           health() {
             return 'connected';
@@ -39,14 +47,14 @@ export const telegramSharedConversationScenario: McE2eScenario = {
     }
     if (!deliverTelegramMessage) throw new Error('Telegram TUI bridge did not start.');
 
-    await deliverTelegramMessage('/help');
-    await deliverTelegramMessage('/status');
+    await deliverTelegramMessage({ text: '/help' });
+    await deliverTelegramMessage({ text: '/status' });
     expect(telegramOutput.join('\n')).toContain('Following thread:');
     expect(telegramOutput.join('\n')).toContain('/status - show safe session status');
     expect(telegramOutput.join('\n')).toContain('MastraCode status');
     expect(telegramOutput.join('\n')).toContain('Telegram: connected');
 
-    await deliverTelegramMessage('Reply to the Telegram e2e message.');
+    await deliverTelegramMessage({ text: 'Reply to the Telegram e2e message.' });
     await runtime.waitForScreenText(/Telegram shared conversation response/i, terminal, 30_000);
     await runtime.waitForScreenText(/Telegram/i, terminal);
 
@@ -58,6 +66,27 @@ export const telegramSharedConversationScenario: McE2eScenario = {
       await runtime.sleep(10);
     }
     expect(telegramOutput).toContain('Telegram shared conversation response');
+
+    await deliverTelegramMessage({ text: 'Ask which Telegram deployment target to use.' });
+    await runtime.waitForScreenText(/Which Telegram deployment target should be used\?/i, terminal, 30_000);
+
+    for (let attempt = 0; attempt < 50 && lastPromptMessageId === undefined; attempt += 1) {
+      await runtime.sleep(10);
+    }
+    if (lastPromptMessageId === undefined) {
+      throw new Error(`Telegram did not receive the ask_user prompt: ${JSON.stringify(telegramOutput)}`);
+    }
+
+    await deliverTelegramMessage({ text: 'Staging', replyToMessageId: lastPromptMessageId });
+    await runtime.waitForScreenText(/Telegram selected the staging deployment target\./i, terminal, 30_000);
+    for (
+      let attempt = 0;
+      attempt < 50 && !telegramOutput.includes('Telegram selected the staging deployment target.');
+      attempt += 1
+    ) {
+      await runtime.sleep(10);
+    }
+    expect(telegramOutput).toContain('Telegram selected the staging deployment target.');
 
     terminal.keyCtrlC();
   },

@@ -1,17 +1,18 @@
-import type { TelegramProjectRegistration } from './broker.js';
+import type { TelegramProjectRegistration, TelegramPrompt } from './broker.js';
 
 export const TELEGRAM_BROKER_PROTOCOL_VERSION = 1;
 
 export type TelegramBrokerClientMessage =
   | { version: 1; type: 'register'; registration: TelegramProjectRegistration }
   | { version: 1; type: 'send'; requestId: string; text: string }
+  | { version: 1; type: 'send_prompt'; requestId: string; prompt: TelegramPrompt }
   | { version: 1; type: 'verify'; requestId: string; threadId: number };
 
 export type TelegramBrokerServerMessage =
   | { version: 1; type: 'registered' }
-  | { version: 1; type: 'sent'; requestId: string }
+  | { version: 1; type: 'sent'; requestId: string; messageId?: number }
   | { version: 1; type: 'verified'; requestId: string }
-  | { version: 1; type: 'message'; text: string }
+  | { version: 1; type: 'message'; text: string; replyToMessageId?: number; promptId?: string }
   | { version: 1; type: 'error'; message: string; requestId?: string };
 
 export function encodeBrokerMessage(message: TelegramBrokerClientMessage | TelegramBrokerServerMessage): string {

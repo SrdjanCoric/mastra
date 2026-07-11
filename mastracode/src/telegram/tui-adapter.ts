@@ -18,14 +18,18 @@ export function createTelegramTuiBridge(env: NodeJS.ProcessEnv = process.env): T
         homeDir,
         registration: { projectPath, threadId },
         executablePath: env.MASTRACODE_TELEGRAM_EXECUTABLE,
-        onMessage: text => {
-          deliveryChain = deliveryChain.then(() => onMessage(text)).catch(() => {});
+        onMessage: message => {
+          deliveryChain = deliveryChain.then(() => onMessage(message)).catch(() => {});
         },
       });
     },
     async sendMessage(text) {
       if (!client) throw new Error('Telegram broker is not connected.');
       await client.sendMessage(text);
+    },
+    async sendPrompt(prompt) {
+      if (!client) throw new Error('Telegram broker is not connected.');
+      return client.sendPrompt(prompt);
     },
     health() {
       return client ? 'connected' : 'disconnected';

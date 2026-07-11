@@ -8,6 +8,7 @@ function createBroker() {
       async () => [],
     ),
     sendMessage: vi.fn<(threadId: number, text: string) => Promise<void>>(async () => {}),
+    sendPrompt: vi.fn(async () => ({ messageId: 55 })),
   };
   return { broker: new TelegramBroker({ allowedUserId: 42, telegram }), telegram };
 }

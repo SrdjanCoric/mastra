@@ -301,6 +301,12 @@ export class PlanApprovalInlineComponent extends Container implements Focusable 
     this.onReject?.();
   }
 
+  resolveExternally(approved: boolean): void {
+    if (this.resolved) return;
+    this.resolved = true;
+    this.showResult(approved ? 'Approved from Telegram' : 'Changes requested from Telegram', approved);
+  }
+
   private showResult(status: string, isApproved: boolean): void {
     this.contentBox.clear();
 

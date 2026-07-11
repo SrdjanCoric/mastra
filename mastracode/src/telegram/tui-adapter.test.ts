@@ -16,7 +16,11 @@ describe('createTelegramTuiBridge', () => {
   });
 
   it('registers the initialized project and forwards messages in both directions', async () => {
-    const client = { sendMessage: vi.fn().mockResolvedValue(undefined), close: vi.fn() };
+    const client = {
+      sendMessage: vi.fn().mockResolvedValue(undefined),
+      sendPrompt: vi.fn().mockResolvedValue({ messageId: 99 }),
+      close: vi.fn(),
+    };
     mocks.connectToTelegramBroker.mockResolvedValue(client);
     const bridge = createTelegramTuiBridge({
       MASTRACODE_TELEGRAM_HOME: '/tmp/home',
@@ -30,9 +34,14 @@ describe('createTelegramTuiBridge', () => {
     await bridge.start(onMessage);
     expect(bridge.health()).toBe('connected');
     const registration = mocks.connectToTelegramBroker.mock.calls[0]?.[0];
-    registration.onMessage('from Telegram');
-    await vi.waitFor(() => expect(onMessage).toHaveBeenCalledWith('from Telegram'));
+    registration.onMessage({ text: 'from Telegram', replyToMessageId: 88 });
+    await vi.waitFor(() => expect(onMessage).toHaveBeenCalledWith({ text: 'from Telegram', replyToMessageId: 88 }));
     await bridge.sendMessage('from MastraCode');
+    await expect(
+      bridge.sendPrompt({ promptId: 'ABC123', kind: 'question', title: 'Question', summary: 'Which branch?' }),
+    ).resolves.toEqual({
+      messageId: 99,
+    });
     bridge.stop();
     expect(bridge.health()).toBe('disconnected');
 

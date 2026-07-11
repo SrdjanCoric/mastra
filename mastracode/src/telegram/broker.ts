@@ -5,12 +5,22 @@ export interface TelegramTextUpdate {
   userId: number;
   threadId: number;
   text: string;
+  replyToMessageId?: number;
+  promptId?: string;
   routable?: boolean;
+}
+
+export interface TelegramPrompt {
+  promptId: string;
+  kind: 'approval' | 'question';
+  title: string;
+  summary: string;
 }
 
 export interface TelegramBrokerTransport {
   getTextUpdates(offset: number | undefined, signal?: AbortSignal): Promise<TelegramTextUpdate[]>;
   sendMessage(threadId: number, text: string): Promise<void>;
+  sendPrompt(threadId: number, prompt: TelegramPrompt): Promise<{ messageId: number }>;
 }
 
 export interface TelegramProjectRegistration {
@@ -18,7 +28,12 @@ export interface TelegramProjectRegistration {
   threadId: number;
 }
 
-export type TelegramBrokerDelivery = { type: 'message'; text: string };
+export type TelegramBrokerDelivery = {
+  type: 'message';
+  text: string;
+  replyToMessageId?: number;
+  promptId?: string;
+};
 
 type DeliveryHandler = (delivery: TelegramBrokerDelivery) => void;
 
@@ -139,14 +154,27 @@ export class TelegramBroker {
       waiter.resolve();
       return;
     }
-    this.projectsByThreadId.get(update.threadId)?.deliver({ type: 'message', text: update.text });
+    this.projectsByThreadId.get(update.threadId)?.deliver({
+      type: 'message',
+      text: update.text,
+      ...(update.replyToMessageId === undefined ? {} : { replyToMessageId: update.replyToMessageId }),
+      ...(update.promptId === undefined ? {} : { promptId: update.promptId }),
+    });
   }
 
   async sendProjectMessage(clientId: string, text: string): Promise<void> {
-    const project = this.projectsByClientId.get(clientId);
-    if (!project) {
-      throw new Error(`Telegram broker client ${clientId} is not registered.`);
-    }
+    const project = this.getProject(clientId);
     await this.options.telegram.sendMessage(project.threadId, text);
+  }
+
+  async sendProjectPrompt(clientId: string, prompt: TelegramPrompt): Promise<{ messageId: number }> {
+    const project = this.getProject(clientId);
+    return this.options.telegram.sendPrompt(project.threadId, prompt);
+  }
+
+  private getProject(clientId: string): ConnectedProject {
+    const project = this.projectsByClientId.get(clientId);
+    if (!project) throw new Error(`Telegram broker client ${clientId} is not registered.`);
+    return project;
   }
 }

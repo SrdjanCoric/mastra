@@ -107,7 +107,15 @@ describe('MastraTUI hook wiring', () => {
   it('forwards only completed assistant text to the external message bridge', async () => {
     const sendMessage = vi.fn().mockResolvedValue(undefined);
     const tui = createBareTui();
-    tui.state.options = { messageBridge: { sendMessage, start: vi.fn(), health: () => 'connected', stop: vi.fn() } };
+    tui.state.options = {
+      messageBridge: {
+        sendMessage,
+        sendPrompt: vi.fn(async () => ({ messageId: 1 })),
+        start: vi.fn(),
+        health: () => 'connected',
+        stop: vi.fn(),
+      },
+    };
 
     await tui.handleEvent({
       type: 'message_end',
@@ -130,7 +138,15 @@ describe('MastraTUI hook wiring', () => {
     const tui = createBareTui() as ReturnType<typeof createBareTui> & {
       syncThreadActivePackMetadata: () => Promise<void>;
     };
-    tui.state.options = { messageBridge: { sendMessage, start: vi.fn(), health: () => 'connected', stop: vi.fn() } };
+    tui.state.options = {
+      messageBridge: {
+        sendMessage,
+        sendPrompt: vi.fn(async () => ({ messageId: 1 })),
+        start: vi.fn(),
+        health: () => 'connected',
+        stop: vi.fn(),
+      },
+    };
     tui.state.currentThreadTitle = 'Investigate broker';
     tui.syncThreadActivePackMetadata = vi.fn().mockResolvedValue(undefined);
 

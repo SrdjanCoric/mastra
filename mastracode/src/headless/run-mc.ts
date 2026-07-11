@@ -167,6 +167,8 @@ export function runMC<TState extends Record<string, unknown>>(options: RunMCOpti
   let maxTurnsExceeded = false;
   let assistantTurns = 0;
   let settled = false;
+  let pendingAgentEndReason: 'complete' | 'aborted' | 'error' | undefined;
+  const pendingPolicyResolutions = new Set<Promise<void>>();
   let unsubscribe: (() => void) | undefined;
   let resolveResult!: (r: RunMCResult) => void;
 
@@ -202,6 +204,32 @@ export function runMC<TState extends Record<string, unknown>>(options: RunMCOpti
     if (settled) return;
     aborted = true;
     session.abort();
+  }
+
+  function finishFromAgentEnd(reason: 'complete' | 'aborted' | 'error'): void {
+    acc.finishReason = reason;
+    if (timedOut) finish('timeout');
+    else if (reason === 'error') finish('error');
+    else if (maxTurnsExceeded && reason !== 'complete') finish('max_turns');
+    else if ((reason === 'aborted' || aborted) && !maxTurnsExceeded) finish('aborted');
+    else finish('completed');
+  }
+
+  function trackPolicyResolution(resolution: Promise<void>): void {
+    pendingPolicyResolutions.add(resolution);
+    void resolution
+      .catch(err => {
+        session.abort();
+        fail(`Resolution policy failed: ${(err as Error).message}`);
+      })
+      .finally(() => {
+        pendingPolicyResolutions.delete(resolution);
+        if (pendingAgentEndReason && pendingPolicyResolutions.size === 0) {
+          const reason = pendingAgentEndReason;
+          pendingAgentEndReason = undefined;
+          finishFromAgentEnd(reason);
+        }
+      });
   }
 
   if (options.signal) {
@@ -260,36 +288,33 @@ export function runMC<TState extends Record<string, unknown>>(options: RunMCOpti
       if (settled) return;
 
       if (event.type === 'tool_approval_required') {
-        let decision: 'approve' | 'deny';
-        try {
-          decision = policy.onToolApproval(event);
-        } catch (err) {
-          fail(`Resolution policy failed: ${(err as Error).message}`);
-          return;
-        }
-        session.respondToToolApproval({
-          decision: decision === 'approve' ? 'approve' : 'decline',
-          toolCallId: event.toolCallId,
-        });
         queue.push(event);
+        const resolution = Promise.resolve()
+          .then(() => policy.onToolApproval(event))
+          .then(decision => {
+            if (settled) return;
+            session.respondToToolApproval({
+              decision: decision === 'approve' ? 'approve' : 'decline',
+              toolCallId: event.toolCallId,
+            });
+          });
+        trackPolicyResolution(resolution);
         return;
       }
 
       if (event.type === 'tool_suspended') {
-        let outcome: ReturnType<ResolutionPolicy['onSuspension']>;
-        try {
-          outcome = policy.onSuspension(event);
-        } catch (err) {
-          fail(`Resolution policy failed: ${(err as Error).message}`);
-          return;
-        }
-        if ('abort' in outcome) {
-          queue.push(event);
-          abort();
-          return;
-        }
-        void session.respondToToolSuspension({ toolCallId: event.toolCallId, resumeData: outcome.resumeData });
         queue.push(event);
+        const resolution = Promise.resolve()
+          .then(() => policy.onSuspension(event))
+          .then(async outcome => {
+            if (settled) return;
+            if ('abort' in outcome) {
+              abort();
+              return;
+            }
+            await session.respondToToolSuspension({ toolCallId: event.toolCallId, resumeData: outcome.resumeData });
+          });
+        trackPolicyResolution(resolution);
         return;
       }
 
@@ -307,19 +332,10 @@ export function runMC<TState extends Record<string, unknown>>(options: RunMCOpti
       }
 
       if (event.type === 'agent_end') {
-        acc.finishReason = event.reason;
-        if (timedOut) {
-          finish('timeout');
-        } else if (event.reason === 'error') {
-          finish('error');
-        } else if (maxTurnsExceeded && event.reason !== 'complete') {
-          // The cap forced an abort while the agent still had work to do.
-          finish('max_turns');
-        } else if ((event.reason === 'aborted' || aborted) && !maxTurnsExceeded) {
-          finish('aborted');
-        } else {
-          finish('completed');
-        }
+        if (event.reason === 'suspended') return;
+        const reason = event.reason ?? 'complete';
+        if (pendingPolicyResolutions.size > 0) pendingAgentEndReason = reason;
+        else finishFromAgentEnd(reason);
       }
     });
 

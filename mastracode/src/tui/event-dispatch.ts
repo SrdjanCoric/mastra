@@ -190,6 +190,7 @@ export async function dispatchEvent(
       break;
 
     case 'thread_changed': {
+      await state.interactivePromptBridge?.cancelAll('thread-changed');
       ectx.showInfo(`Switched to thread: ${event.threadId}`);
       // Clear per-thread ephemeral state first so renderExistingMessages
       // and other downstream observers see clean state.

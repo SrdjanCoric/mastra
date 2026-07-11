@@ -28,14 +28,16 @@ export interface ResolutionPolicy {
    * Called for every `tool_approval_required` event. Return the decision; the
    * runner forwards it to `session.respondToToolApproval`.
    */
-  onToolApproval(event: Extract<AgentControllerEvent, { type: 'tool_approval_required' }>): 'approve' | 'deny';
+  onToolApproval(
+    event: Extract<AgentControllerEvent, { type: 'tool_approval_required' }>,
+  ): 'approve' | 'deny' | Promise<'approve' | 'deny'>;
   /**
    * Called for every `tool_suspended` event. Return `resumeData` to resume the
    * tool, or `{ abort: true }` to abort the run.
    */
   onSuspension(
     event: Extract<AgentControllerEvent, { type: 'tool_suspended' }>,
-  ): { resumeData: unknown } | { abort: true };
+  ): { resumeData: unknown } | { abort: true } | Promise<{ resumeData: unknown } | { abort: true }>;
 }
 
 /** Thread selection / mutation options resolved up front by `runMC`. */

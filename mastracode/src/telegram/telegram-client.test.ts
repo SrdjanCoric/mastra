@@ -64,6 +64,7 @@ describe('TelegramBotClient authorization', () => {
             text: 'hello',
             chat: { id: -100456 },
             from: { id: 123 },
+            reply_to_message: { message_id: 99 },
           },
         },
         { update_id: 12, message: { text: 'outside', chat: { id: -999 }, from: { id: 123 } } },
@@ -74,10 +75,76 @@ describe('TelegramBotClient authorization', () => {
     const updates = await new TelegramBotClient(config, telegramFetch).getTextUpdates(11);
 
     expect(updates).toEqual([
-      { updateId: 11, userId: 123, threadId: 42, text: 'hello' },
+      { updateId: 11, userId: 123, threadId: 42, text: 'hello', replyToMessageId: 99 },
       { updateId: 12, userId: 123, threadId: 0, text: 'outside', routable: false },
       { updateId: 13, userId: 123, threadId: 42, text: '', routable: false },
     ]);
+  });
+
+  it('maps approval button callbacks to their internal prompt identity', async () => {
+    const telegramFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        response([
+          {
+            update_id: 12,
+            callback_query: {
+              id: 'callback-1',
+              data: 'mastracode:ABC123:approve',
+              from: { id: 123 },
+              message: { chat: { id: -100456 }, message_thread_id: 42 },
+            },
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(response(true));
+
+    await expect(new TelegramBotClient(config, telegramFetch).getTextUpdates(undefined)).resolves.toEqual([
+      { updateId: 12, userId: 123, threadId: 42, text: 'approve', promptId: 'ABC123' },
+    ]);
+    expect(telegramFetch.mock.calls[1][0]).toContain('/answerCallbackQuery');
+  });
+
+  it('sends approvals with Telegram buttons and keeps prompt identities out of visible text', async () => {
+    const telegramFetch = vi.fn().mockResolvedValue(response({ message_id: 99 }));
+
+    const result = await new TelegramBotClient(config, telegramFetch).sendPrompt(42, {
+      promptId: 'ABC123',
+      kind: 'approval',
+      title: 'Tool approval',
+      summary: 'Action: execute command',
+    });
+
+    expect(result).toEqual({ messageId: 99 });
+    const body = JSON.parse(telegramFetch.mock.calls[0][1].body);
+    expect(body).toMatchObject({
+      chat_id: -100456,
+      message_thread_id: 42,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: 'Approve', callback_data: 'mastracode:ABC123:approve' },
+            { text: 'Deny', callback_data: 'mastracode:ABC123:deny' },
+          ],
+        ],
+      },
+    });
+    expect(body.text).not.toContain('ABC123');
+  });
+
+  it('sends questions with Telegram ForceReply', async () => {
+    const telegramFetch = vi.fn().mockResolvedValue(response({ message_id: 100 }));
+
+    await new TelegramBotClient(config, telegramFetch).sendPrompt(42, {
+      promptId: 'ABC123',
+      kind: 'question',
+      title: 'Question',
+      summary: 'Which branch?',
+    });
+
+    const body = JSON.parse(telegramFetch.mock.calls[0][1].body);
+    expect(body.reply_markup).toEqual({ force_reply: true, selective: true });
+    expect(body.text).not.toContain('ABC123');
   });
 
   it('splits long code blocks into valid, balanced Telegram messages', () => {

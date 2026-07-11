@@ -9,6 +9,40 @@
       "response": {
         "content": "Telegram shared conversation response"
       }
+    },
+    {
+      "match": {
+        "userMessage": "Ask which Telegram deployment target to use.",
+        "model": "gpt-5.4-mini",
+        "endpoint": "chat",
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "id": "call_telegram_ask_user",
+            "name": "ask_user",
+            "arguments": {
+              "question": "Which Telegram deployment target should be used?",
+              "options": [
+                { "label": "Staging", "description": "Use staging" },
+                { "label": "Production", "description": "Use production" }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "model": "gpt-5.4-mini",
+        "endpoint": "chat",
+        "toolCallId": "call_telegram_ask_user",
+        "hasToolResult": true
+      },
+      "response": {
+        "content": "Telegram selected the staging deployment target."
+      }
     }
   ]
 }

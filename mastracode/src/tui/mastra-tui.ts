@@ -57,6 +57,7 @@ import { showError, showInfo, showFormattedError, notify } from './display.js';
 import { dispatchEvent } from './event-dispatch.js';
 import { isGoalJudgeInputLocked, showGoalJudgeInputLockInfo } from './goal-input-lock.js';
 import type { EventHandlerContext } from './handlers/types.js';
+import { InteractivePromptBridge } from './interactive-prompt-bridge.js';
 import { askModalQuestion } from './modal-question.js';
 import { showModalOverlay } from './overlay.js';
 import { promptForApiKeyIfNeeded } from './prompt-api-key.js';
@@ -83,7 +84,7 @@ import {
   renderExistingTasks,
 } from './setup.js';
 import { handleShellPassthrough } from './shell.js';
-import type { MastraTUIOptions, TUIState } from './state.js';
+import type { MastraTUIOptions, TUIBridgeIncomingMessage, TUIState } from './state.js';
 import { createTUIState, getGithubPrSubscriptionsFromMetadata } from './state.js';
 import { updateStatusLine } from './status-line.js';
 
@@ -173,6 +174,12 @@ export class MastraTUI {
 
   constructor(options: MastraTUIOptions) {
     this.state = createTUIState(options);
+    if (options.messageBridge) {
+      this.state.interactivePromptBridge = new InteractivePromptBridge({
+        sendMessage: text => options.messageBridge!.sendMessage(text),
+        sendPrompt: prompt => options.messageBridge!.sendPrompt(prompt),
+      });
+    }
 
     options.githubSignals?.onSubscriptionsChanged(event => {
       const currentThreadId = this.state.session?.thread?.getId?.();
@@ -568,6 +575,7 @@ export class MastraTUI {
       }
       if (wasActive) {
         this.state.userInitiatedAbort = true;
+        await this.state.interactivePromptBridge?.cancelAll('stopped');
         this.state.pendingApprovalDismiss?.({ reason: 'telegram_stop', message: 'Stopped from Telegram.' });
         this.state.session.abort();
       }
@@ -610,8 +618,10 @@ export class MastraTUI {
     );
   }
 
-  private async receiveExternalMessage(text: string): Promise<void> {
-    const input = parseTelegramCommand(text);
+  private async receiveExternalMessage(message: TUIBridgeIncomingMessage): Promise<void> {
+    if (await this.state.interactivePromptBridge?.receiveMessage(message)) return;
+
+    const input = parseTelegramCommand(message.text);
     if (input.type === 'command') {
       await this.handleTelegramCommand(input.command);
       return;
@@ -679,6 +689,7 @@ export class MastraTUI {
    * Stop the TUI and clean up.
    */
   stop(): void {
+    void this.state.interactivePromptBridge?.cancelAll('shutdown');
     this.state.options?.messageBridge?.stop();
     this.stopCaffeinate();
 

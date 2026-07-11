@@ -228,15 +228,44 @@ export function handleToolApprovalRequired(
   args: unknown,
 ): void {
   const { state } = ctx;
-  // Compute category label for the dialog
   const category = getToolCategory(toolName);
   const categoryLabel = category ? TOOL_CATEGORIES[category]?.label : undefined;
+  let settled = false;
+  let declineContext: { reason?: string; message?: string } | undefined;
+  let promptHandle: ReturnType<NonNullable<typeof state.interactivePromptBridge>['present']> | undefined;
 
-  // Send notification to alert the user
   ctx.notify('tool_approval', `Approve ${toolName}?`);
 
   const firePermissionResult = (decision: 'approved' | 'declined' | 'dismissed' | 'auto_approved') => {
     state.hookManager?.runPermissionResult('tool_approval', toolCallId, toolName, decision, args).catch(() => {});
+  };
+  const complete = (action: ApprovalAction, source: 'terminal' | 'telegram', dismissed = false) => {
+    if (settled) return;
+    settled = true;
+    state.ui.hideOverlay();
+    state.pendingApprovalDismiss = null;
+    if (action.type === 'approve') {
+      firePermissionResult('approved');
+      state.session.respondToToolApproval({ decision: 'approve', toolCallId });
+    } else if (action.type === 'always_allow_category') {
+      firePermissionResult('approved');
+      state.session.respondToToolApproval({ decision: 'always_allow_category', toolCallId });
+    } else if (action.type === 'yolo') {
+      firePermissionResult('auto_approved');
+      void state.session.state.set({ yolo: true } as any);
+      state.session.respondToToolApproval({ decision: 'approve', toolCallId });
+    } else {
+      firePermissionResult(dismissed ? 'dismissed' : 'declined');
+      state.session.respondToToolApproval({ decision: 'decline', toolCallId, declineContext });
+    }
+    if (source === 'telegram') state.ui.requestRender();
+  };
+  const resolveLocal = (action: ApprovalAction) => {
+    if (!promptHandle) {
+      complete(action, 'terminal');
+      return;
+    }
+    promptHandle.resolveLocal({ type: action.type === 'decline' ? 'deny' : action.type });
   };
 
   const dialog = new ToolApprovalDialogComponent({
@@ -244,38 +273,31 @@ export function handleToolApprovalRequired(
     toolName,
     args,
     categoryLabel,
-    onAction: (action: ApprovalAction) => {
-      state.ui.hideOverlay();
-      state.pendingApprovalDismiss = null;
-      if (action.type === 'approve') {
-        firePermissionResult('approved');
-        state.session.respondToToolApproval({ decision: 'approve' });
-      } else if (action.type === 'always_allow_category') {
-        firePermissionResult('approved');
-        state.session.respondToToolApproval({ decision: 'always_allow_category' });
-      } else if (action.type === 'yolo') {
-        firePermissionResult('auto_approved');
-        void state.session.state.set({ yolo: true } as any);
-        state.session.respondToToolApproval({ decision: 'approve' });
-      } else {
-        firePermissionResult('declined');
-        state.session.respondToToolApproval({ decision: 'decline' });
-      }
-    },
+    onAction: resolveLocal,
   });
 
-  // Set up dismissal to decline
-  state.pendingApprovalDismiss = declineContext => {
-    state.ui.hideOverlay();
-    state.pendingApprovalDismiss = null;
-    firePermissionResult('dismissed');
-    state.session.respondToToolApproval({ decision: 'decline', declineContext });
+  state.pendingApprovalDismiss = context => {
+    declineContext = context;
+    if (!promptHandle) complete({ type: 'decline' }, 'terminal', true);
+    else promptHandle.resolveLocal({ type: 'deny' });
   };
 
-  // Show the dialog as an overlay
   showModalOverlay(state.ui, dialog, { widthPercent: 0.7 });
   dialog.focused = true;
   state.ui.requestRender();
+
+  promptHandle = state.interactivePromptBridge?.present({
+    kind: 'approval',
+    title: 'Tool approval',
+    summary: `Action: ${toolName}\nRisk category: ${categoryLabel ?? 'uncategorized'}\nArguments are available only in the terminal.`,
+    onResolve: (response, source) => {
+      if (response.type === 'approve') complete({ type: 'approve' }, source);
+      else if (response.type === 'deny') complete({ type: 'decline' }, source);
+      else if (response.type === 'always_allow_category') complete({ type: 'always_allow_category' }, source);
+      else if (response.type === 'yolo') complete({ type: 'yolo' }, source);
+    },
+    onCancel: () => complete({ type: 'decline' }, 'telegram', true),
+  });
 }
 
 export function handleToolStart(ctx: EventHandlerContext, toolCallId: string, toolName: string, args: unknown): void {
