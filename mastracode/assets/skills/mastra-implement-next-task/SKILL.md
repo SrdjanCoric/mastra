@@ -76,7 +76,11 @@ Handle findings this way:
 
 Security findings are special: do not auto-dismiss or down-rank them. Fix obvious safe in-scope security bugs only when the safe action is clear; otherwise use `[confirm-security]`.
 
-### 6. Update docs and task log
+### 6. Run end-to-end proof
+
+After task review and its required fixes, when generally possible, run an unattended end-to-end proof of the highest-level operator-visible behavior changed by the issue. Prefer Playwright MCP for browser behavior and executable scripts or disposable environments for CLI, API, Git, and provider workflows. When a literal end-to-end proof is not reasonably possible, record the concrete reason and run the highest-level automated substitute; unit tests alone are not end-to-end proof.
+
+### 7. Update docs and task log
 
 If the task changes user-facing behavior, setup, commands, configuration, workflow, or product story, update `README.md` before PR. Use `mastra-write-well` for user-facing prose when available. If no README change is needed, record why in the task log.
 
@@ -86,18 +90,19 @@ Update the task file with:
 - implementation notes,
 - verification commands and results,
 - review attempt summary,
+- end-to-end proof result or concrete reason for substitute proof,
 - README decision,
 - any human checkpoint answers.
 
 Do not mark the task `[x]` here.
 
-### 7. Create and merge PR
+### 8. Create and merge PR
 
 Invoke `mastra-create-pr` to commit, push, open the PR, wait for required checks, recover safe CI failures, and merge on the happy path. The master workflow is AFK by default; do not ask for PR approval unless repo policy, credentials, branch protection, security, or ambiguity requires a human.
 
 After the PR exists and corresponds to this task branch, flip `[~]→[>]`. `mastra-create-pr` then owns waiting for checks and merging the PR.
 
-### 8. Sync main and close out
+### 9. Sync main and close out
 
 After `mastra-create-pr` reports the PR merged, invoke `mastra-sync-main`. It checks out `main`, pulls the merge, confirms the merge landed locally, cleans safe merged branches, flips `[>]→[x]`, moves the task file to `plans/tasks/done/`, and records the merge closeout. No git worktree cleanup is involved.
 
