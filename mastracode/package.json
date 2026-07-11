@@ -6,6 +6,7 @@
   "files": [
     "dist",
     "!dist/web",
+    "assets/skills",
     "CHANGELOG.md"
   ],
   "homepage": "https://mastra.ai",

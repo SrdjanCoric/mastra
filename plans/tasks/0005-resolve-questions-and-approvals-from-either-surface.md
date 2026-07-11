@@ -8,6 +8,8 @@
 
 Bridge prompt-specific questions, tool approvals, and suspended-tool interactions to Telegram while preserving the native terminal UI. The first valid response from either surface resolves the exact pending interaction. Port asynchronous policy resolution from the runtime patch into source so runs cannot complete while a remote decision is pending.
 
+Adapt `mastracode-remote`'s `telegram-wait-bridge` reply parsing, allowed-user/thread checks, and exact approval/denial vocabulary, then strengthen it with prompt identities and first-response-wins coordination against the native TUI interaction APIs. Do not reuse the daemon or workflow-runner ownership model.
+
 ## AFK tasks
 
 - [ ] Add failing tests for question answers, approvals, denials, local-first and Telegram-first races, duplicate delivery, delayed/stale replies, cancellation, shutdown, policy rejection, and agent-end while a decision promise is pending.

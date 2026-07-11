@@ -8,6 +8,8 @@
 
 Keep the project topic bound to the thread currently active in the TUI and add the complete v1 Telegram command surface: `/status`, `/stop`, and `/help`. Commands must be deterministic and bypass the model. Model selection, thread switching, settings, shell passthrough, and privileged commands remain terminal-only.
 
+Adapt the command-first routing order from `mastracode-remote`'s `telegram-update-poller`, but replace remote workflow commands with this experiment's three deterministic session commands and live TUI state. Telegram must never create or select a MastraCode thread.
+
 ## AFK tasks
 
 - [ ] Add failing tests for initial thread sync, thread changes, command parsing, stale/unknown commands, status redaction, stop while idle/active/suspended, queued Telegram follow-up clearing, and continued local usability.

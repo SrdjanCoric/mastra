@@ -2,25 +2,32 @@ import fs from 'node:fs';
 
 export const TELEGRAM_READINESS_SCHEMA_VERSION = 1;
 
+export interface TelegramProjectReadiness {
+  projectPath: string;
+  threadId: number;
+  initialized: true;
+  checkedAt: string;
+}
+
 export interface TelegramReadiness {
   schemaVersion: typeof TELEGRAM_READINESS_SCHEMA_VERSION;
-  initialized: true;
+  projects: TelegramProjectReadiness[];
 }
 
 const SETUP_GUIDANCE = 'Telegram is not initialized. Run `mastracode-telegram --init` from this project first.';
 
-export function assertTelegramInitialized(readinessFile: string): void {
+export function assertTelegramInitialized(readinessFile: string, projectPath: string): TelegramProjectReadiness {
   try {
-    const readiness = JSON.parse(fs.readFileSync(readinessFile, 'utf8')) as unknown;
+    const canonicalPath = fs.realpathSync(projectPath);
+    const readiness = JSON.parse(fs.readFileSync(readinessFile, 'utf8')) as TelegramReadiness;
+    const project = readiness.projects?.find(candidate => candidate.projectPath === canonicalPath);
     if (
-      typeof readiness === 'object' &&
-      readiness !== null &&
-      'schemaVersion' in readiness &&
       readiness.schemaVersion === TELEGRAM_READINESS_SCHEMA_VERSION &&
-      'initialized' in readiness &&
-      readiness.initialized === true
+      project?.initialized === true &&
+      Number.isInteger(project.threadId) &&
+      project.threadId > 0
     ) {
-      return;
+      return project;
     }
   } catch {}
 
