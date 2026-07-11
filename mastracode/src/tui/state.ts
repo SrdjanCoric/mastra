@@ -47,6 +47,7 @@ export interface PendingSignalMessage {
   text: string;
   images?: Array<{ data: string; mimeType: string }>;
   isInterjection?: boolean;
+  label?: string;
 }
 
 export interface GithubPrSubscriptionBadge {
@@ -91,6 +92,12 @@ export function getGithubPrSubscriptionsFromMetadata(
 // =============================================================================
 // MastraTUIOptions
 // =============================================================================
+
+export interface TUIMessageBridge {
+  start(onMessage: (text: string) => Promise<void>): Promise<void>;
+  sendMessage(text: string): Promise<void>;
+  stop(): void;
+}
 
 export interface MastraTUIOptions {
   /** The controller instance */
@@ -141,6 +148,9 @@ export interface MastraTUIOptions {
 
   /** Optional terminal injection for in-process tests. Defaults to ProcessTerminal. */
   terminal?: Terminal;
+
+  /** Optional external message transport sharing this TUI session. */
+  messageBridge?: TUIMessageBridge;
 }
 
 // =============================================================================

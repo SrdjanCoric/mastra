@@ -33,7 +33,7 @@ This is the project's master plan: a durable architectural header plus an ordere
 
 - [x] 0001 · Establish the isolated Telegram runtime foundation → tasks/done/0001-establish-isolated-telegram-runtime-foundation.md (PR #1, `8a124467`)
 - [x] 0002 · Initialize Telegram for a MastraCode project (after 0001) → tasks/done/0002-initialize-telegram-for-a-mastracode-project.md (PR #2, `e4197d5d`)
-- [ ] 0003 · Share one conversation across the TUI and Telegram (after 0002) → tasks/0003-share-one-conversation-across-tui-and-telegram.md
+- [>] 0003 · Share one conversation across the TUI and Telegram (after 0002) → tasks/0003-share-one-conversation-across-tui-and-telegram.md (PR #3)
 - [ ] 0004 · Add thread routing and Telegram session commands (after 0003) → tasks/0004-add-thread-routing-and-telegram-session-commands.md
 - [ ] 0005 · Resolve questions and approvals from either surface (after 0004) → tasks/0005-resolve-questions-and-approvals-from-either-surface.md
 - [ ] 0006 · Recover safely from Telegram and process failures (after 0005) → tasks/0006-recover-safely-from-telegram-and-process-failures.md

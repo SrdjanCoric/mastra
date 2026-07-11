@@ -128,6 +128,7 @@ export type ScenarioName =
   | 'task-patch-tools'
   | 'task-progress-events'
   | 'task-prompt-context-next-turn'
+  | 'telegram-shared-conversation'
   | 'thread-history'
   | 'tool-history-reload'
   | 'plugins-streaming-tool-output'
@@ -183,7 +184,7 @@ export type McE2eStartMastraCodeAppOptions = {
   onTuiCreated?: (tui: unknown) => Promise<void> | void;
   setupDebugLogging?: boolean;
   startupWarnings?: string[];
-  tui?: Partial<Pick<MastraTUIOptions, 'appName' | 'initialMessage' | 'inlineQuestions' | 'verbose'>>;
+  tui?: Partial<Pick<MastraTUIOptions, 'appName' | 'initialMessage' | 'inlineQuestions' | 'messageBridge' | 'verbose'>>;
 };
 
 export type McE2eInProcessAppContext = McE2ePrepareContext & {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -10,6 +11,18 @@ export interface TelegramRuntimePaths {
   runtimeDir: string;
   logsDir: string;
   readinessFile: string;
+}
+
+export function resolveTelegramBrokerPaths(
+  homeDir: string,
+  botToken: string,
+): { socketPath: string; lockPath: string } {
+  const runtimeDir = resolveTelegramRuntimePaths(homeDir).runtimeDir;
+  const tokenId = createHash('sha256').update(botToken).digest('hex').slice(0, 16);
+  return {
+    socketPath: path.join(runtimeDir, `broker-${tokenId}.sock`),
+    lockPath: path.join(runtimeDir, `broker-${tokenId}.lock`),
+  };
 }
 
 export function resolveTelegramRuntimePaths(homeDir = os.homedir()): TelegramRuntimePaths {

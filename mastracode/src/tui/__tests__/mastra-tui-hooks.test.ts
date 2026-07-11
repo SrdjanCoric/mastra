@@ -104,6 +104,27 @@ describe('MastraTUI hook wiring', () => {
     expect(mocks.showError).not.toHaveBeenCalled();
   });
 
+  it('forwards only completed assistant text to the external message bridge', async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const tui = createBareTui();
+    tui.state.options = { messageBridge: { sendMessage, start: vi.fn(), stop: vi.fn() } };
+
+    await tui.handleEvent({
+      type: 'message_end',
+      message: {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Completed ' },
+          { type: 'text', text: 'answer' },
+        ],
+        createdAt: new Date(),
+      },
+    });
+
+    expect(sendMessage).toHaveBeenCalledWith('Completed answer');
+  });
+
   it.each([
     ['aborted', 'aborted'],
     ['error', 'error'],

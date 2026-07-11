@@ -266,6 +266,18 @@ export class MastraTUI {
   async run(): Promise<void> {
     await this.init();
 
+    if (this.state.options.messageBridge) {
+      try {
+        await this.state.options.messageBridge.start(text => this.receiveExternalMessage(text));
+      } catch (error) {
+        showInfo(
+          this.state,
+          `Telegram is unavailable; continuing locally: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        this.state.options.messageBridge = undefined;
+      }
+    }
+
     // Run SessionStart hooks (fire and forget)
     const hookMgr = this.state.hookManager;
     if (hookMgr) {
@@ -466,7 +478,11 @@ export class MastraTUI {
     });
   }
 
-  private signalMessage(content: string, images?: Array<{ data: string; mimeType: string }>): void {
+  private signalMessage(
+    content: string,
+    images?: Array<{ data: string; mimeType: string }>,
+    options?: { label?: string },
+  ): void {
     const hasActiveRun = this.state.session.stream.isActive();
 
     const send = () => {
@@ -481,9 +497,14 @@ export class MastraTUI {
       });
 
       if (hasActiveRun) {
-        addPendingUserMessage(this.state, signal.id, content, images, { isInterjection: true });
+        addPendingUserMessage(this.state, signal.id, content, images, {
+          isInterjection: true,
+          label: options?.label,
+        });
       } else {
-        addUserMessage(this.state, this.createUserSignalMessage(content, images, signal.id));
+        const message = this.createUserSignalMessage(content, images, signal.id);
+        if (options) addUserMessage(this.state, message, options);
+        else addUserMessage(this.state, message);
       }
 
       signal.accepted.catch((error: unknown) => {
@@ -505,6 +526,41 @@ export class MastraTUI {
     pendingThread.then(send).catch((error: unknown) => {
       showError(this.state, error instanceof Error ? error.message : 'Unknown error');
     });
+  }
+
+  private async receiveExternalMessage(text: string): Promise<void> {
+    const content = text.trim();
+    if (!content) return;
+
+    if (this.state.session.run.isRunning()) {
+      this.signalMessage(content, undefined, { label: 'Telegram' });
+      return;
+    }
+    if (!this.state.session.model.hasSelection()) {
+      showInfo(this.state, 'Telegram message received, but no model is selected. Use /models in the terminal.');
+      return;
+    }
+
+    const messageId = `telegram-user-${Date.now()}`;
+    addUserMessage(
+      this.state,
+      {
+        id: messageId,
+        role: 'user',
+        content: [{ type: 'text', text: content }],
+        createdAt: new Date(),
+      },
+      { label: 'Telegram' },
+    );
+    this.state.ui.requestRender();
+
+    const allowed = await this.runUserPromptHook(content);
+    if (!allowed) return;
+    if (this.state.pendingNewThread) {
+      await this.state.session.thread.create();
+      this.state.pendingNewThread = false;
+    }
+    this.fireMessage(content);
   }
 
   private queueFollowUpMessage(text: string): void {
@@ -531,6 +587,7 @@ export class MastraTUI {
    * Stop the TUI and clean up.
    */
   stop(): void {
+    this.state.options?.messageBridge?.stop();
     this.stopCaffeinate();
 
     // Run SessionEnd hooks (best-effort, don't await)
@@ -775,6 +832,21 @@ export class MastraTUI {
       this.fireLifecycleHooksForEvent(event);
       await dispatchEvent(event, this.getEventContext(), this.state);
       this.captureAgentControllerAnalytics(event);
+
+      if (event.type === 'message_end' && event.message.role === 'assistant' && this.state.options.messageBridge) {
+        const text = event.message.content
+          .flatMap(part => (part.type === 'text' && 'text' in part ? [part.text] : []))
+          .join('')
+          .trim();
+        if (text) {
+          this.state.options.messageBridge.sendMessage(text).catch(error => {
+            showInfo(
+              this.state,
+              `Telegram delivery failed; continuing locally: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          });
+        }
+      }
 
       if (event.type === 'thread_created') {
         await this.syncThreadActivePackMetadata(event.thread);

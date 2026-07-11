@@ -117,6 +117,11 @@ async function tuiMain(pipedInput?: string | null) {
     theme: themeMode,
   });
 
+  const messageBridge =
+    process.env.MASTRACODE_TELEGRAM_ENABLED === '1'
+      ? (await import('./telegram/tui-adapter.js')).createTelegramTuiBridge(process.env)
+      : undefined;
+
   const tui = new MastraTUI({
     controller: controller,
     session,
@@ -129,6 +134,7 @@ async function tuiMain(pipedInput?: string | null) {
     version: getCurrentVersion(),
     inlineQuestions: true,
     githubSignals: result.githubSignals,
+    ...(messageBridge ? { messageBridge } : {}),
     ...(pipedInput ? { initialMessage: `The following was piped via stdin:\n\n${pipedInput}` } : {}),
   });
   tui.run().catch(error => {

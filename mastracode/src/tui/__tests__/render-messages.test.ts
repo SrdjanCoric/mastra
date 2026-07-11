@@ -556,6 +556,22 @@ describe('addUserMessage', () => {
     expect(rendered).toContain('╭ steer ');
   });
 
+  it('preserves an external source label when a pending signal is confirmed', () => {
+    const state = createState();
+
+    addPendingUserMessage(state, 'pending-signal-1', 'continue with this', undefined, {
+      isInterjection: true,
+      label: 'Telegram',
+    });
+    addUserMessage(state, createUserMessage('continue with this', 'pending-signal-1'));
+
+    const rendered = (state.chatContainer.children[0] as UserMessageComponent)
+      .render(80)
+      .join('\n')
+      .replace(/\x1b\[[0-9;]*m/g, '');
+    expect(rendered).toContain('╭ Telegram ');
+  });
+
   it('replaces a pending signal with the echoed user message once the stream is settled', () => {
     const state = createState();
 

@@ -13,6 +13,17 @@ describe('runTelegramCli', () => {
     expect(startTui).not.toHaveBeenCalled();
   });
 
+  it('routes the internal broker command without starting the TUI', async () => {
+    const initialize = vi.fn().mockResolvedValue(undefined);
+    const startTui = vi.fn().mockResolvedValue(undefined);
+    const startBroker = vi.fn().mockResolvedValue(undefined);
+
+    await runTelegramCli(['--broker', '--home-dir', '/tmp/test-home'], { initialize, startTui, startBroker });
+
+    expect(startBroker).toHaveBeenCalledWith('/tmp/test-home');
+    expect(startTui).not.toHaveBeenCalled();
+  });
+
   it('rejects --init when combined with stock TUI arguments', async () => {
     const initialize = vi.fn().mockResolvedValue(undefined);
     const startTui = vi.fn().mockResolvedValue(undefined);

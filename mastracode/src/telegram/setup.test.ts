@@ -68,6 +68,7 @@ describe('initializeTelegramProject', () => {
     expect((await fs.stat(secretsPath)).mode & 0o777).toBe(0o600);
     expect(JSON.stringify(readiness)).not.toContain('secret-token');
     expect(JSON.stringify(registry)).not.toContain('secret-token');
+    expect(await fs.readdir(path.join(root, 'runtime'))).toEqual([]);
     await expect(fs.access(path.join(homeDir, '.mastracode-remote'))).rejects.toThrow();
   });
 

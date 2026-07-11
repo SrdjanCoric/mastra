@@ -126,6 +126,7 @@ import { taskInlineTransitionsScenario } from './task-inline-transitions.js';
 import { taskPatchToolsScenario } from './task-patch-tools.js';
 import { taskProgressEventsScenario } from './task-progress-events.js';
 import { taskPromptContextNextTurnScenario } from './task-prompt-context-next-turn.js';
+import { telegramSharedConversationScenario } from './telegram-shared-conversation.js';
 import { threadHistoryScenario } from './thread-history.js';
 import { toolHistoryReloadScenario } from './tool-history-reload.js';
 import { toolSchemaCompatScenario } from './tool-schema-compat.js';
@@ -271,6 +272,7 @@ export const scenarios: Record<ScenarioName, McE2eScenario> = {
   'task-patch-tools': taskPatchToolsScenario,
   'task-progress-events': taskProgressEventsScenario,
   'task-prompt-context-next-turn': taskPromptContextNextTurnScenario,
+  'telegram-shared-conversation': telegramSharedConversationScenario,
   'thread-history': threadHistoryScenario,
   'tool-history-reload': toolHistoryReloadScenario,
   'tool-schema-compat': toolSchemaCompatScenario,
