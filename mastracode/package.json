@@ -1,7 +1,7 @@
 {
-  "name": "mastracode",
-  "version": "0.30.0",
-  "description": "",
+  "name": "@srdjancoric/mastracode-telegram",
+  "version": "0.1.0",
+  "description": "MastraCode TUI with an optional in-process Telegram interface",
   "type": "module",
   "files": [
     "dist",
@@ -20,7 +20,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "mastracode": "./dist/cli.js"
+    "mastracode-telegram": "./dist/telegram-cli.js"
   },
   "exports": {
     ".": {

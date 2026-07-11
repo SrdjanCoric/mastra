@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 const packageJsonPath = new URL('../../package.json', import.meta.url);
 
 type PackageJson = {
+  name?: string;
+  version?: string;
   type?: string;
   files?: string[];
   main?: string;
@@ -25,9 +27,12 @@ describe('mastracode package metadata', () => {
   it('keeps the installed CLI entrypoint and public exports aligned with dist output', async () => {
     const pkg = await readPackageJson();
 
+    expect(pkg.name).toBe('@srdjancoric/mastracode-telegram');
+    expect(pkg.version).toBe('0.1.0');
     expect(pkg.type).toBe('module');
     expect(pkg.files).toEqual(expect.arrayContaining(['dist', 'CHANGELOG.md']));
-    expect(pkg.bin).toEqual({ mastracode: './dist/cli.js' });
+    expect(pkg.bin).toEqual({ 'mastracode-telegram': './dist/telegram-cli.js' });
+    expect(pkg.bin).not.toHaveProperty('mastracode');
     expect(pkg.main).toBe('dist/index.js');
     expect(pkg.types).toBe('dist/index.d.ts');
     expect(pkg.exports).toMatchObject({

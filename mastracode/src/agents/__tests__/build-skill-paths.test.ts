@@ -38,6 +38,7 @@ describe('buildSkillPaths', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('returns all six base skill directories with default configDir', () => {
@@ -63,6 +64,15 @@ describe('buildSkillPaths', () => {
     expect(result).toContain(path.join(projectPath, '.agents', 'skills'));
     expect(result).toContain(path.join(home, '.claude', 'skills'));
     expect(result).toContain(path.join(home, '.agents', 'skills'));
+  });
+
+  it('uses only MastraCode skill directories when the Telegram package scopes discovery', () => {
+    vi.stubEnv('MASTRACODE_SKILLS_SCOPE', 'mastracode');
+
+    expect(buildSkillPaths(projectPath, DEFAULT_CONFIG_DIR)).toEqual([
+      path.join(projectPath, '.mastracode', 'skills'),
+      path.join(home, '.mastracode', 'skills'),
+    ]);
   });
 
   it('deduplicates paths that resolve to the same directory', () => {

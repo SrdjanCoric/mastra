@@ -18,6 +18,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     cli: 'src/main.ts',
+    'telegram-cli': 'src/telegram-main.ts',
     tui: 'src/tui/index.ts',
     acp: 'src/acp.ts',
     headless: 'src/headless/index.ts',
