@@ -6,7 +6,7 @@
 
 ## What to build
 
-Close the publication gate with automated end-to-end and package proof, user-facing documentation, release metadata, and one manual live Telegram verification. The checks must run from isolated temporary homes and package prefixes and must prove that production MastraCode, production `mastracode-remote`, external checkouts, launchd, and Telegram resources are not mutated accidentally.
+Close the publication gate for `@srdjancoric/mastracode-telegram` with automated end-to-end and package proof, user-facing documentation, release metadata, and one manual live Telegram verification. Publish only the monorepo's `mastracode/` workspace. The checks must run from isolated temporary homes and package prefixes and must prove that the official `mastracode` package/executable, production `mastracode-remote`, external checkouts, launchd, and Telegram resources are not mutated accidentally.
 
 ## AFK tasks
 
@@ -22,8 +22,8 @@ Close the publication gate with automated end-to-end and package proof, user-fac
 ## Acceptance criteria
 
 - [ ] All publication-gate behaviors in `ARCHITECTURE.md` have automated coverage except the explicitly manual live-service check.
-- [ ] The packed experiment installs and runs from isolated state without overwriting an existing published runtime identity.
-- [ ] Ordinary `mastracode` behavior and MastraCode-only skill discovery remain proven.
+- [ ] The packed `@srdjancoric/mastracode-telegram` workspace installs and runs from isolated state with the `mastracode-telegram` executable and does not publish any other monorepo package.
+- [ ] The official `mastracode` package/executable, ordinary behavior, and MastraCode-only skill discovery remain proven.
 - [ ] Production `~/.mastracode-remote/`, launchd services, global package prefixes, external production checkouts, and unrelated Telegram topics are untouched.
 - [ ] User documentation is sufficient to initialize, run, stop, troubleshoot, and clean up the experiment safely.
 - [ ] The manual live Telegram checklist passes and its evidence is recorded without secrets or message content.

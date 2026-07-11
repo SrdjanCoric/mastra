@@ -4,7 +4,7 @@ Status: agreed for the `experiment/telegram-tui` branch on 2026-07-11.
 
 ## Goal
 
-Add an optional Telegram interface to the stock MastraCode TUI. `mastracode --telegram-init` prepares an isolated Telegram runtime, and `mastracode --telegram` starts the normal TUI with Telegram attached to the same controller, session, and active thread. Ordinary `mastracode` behavior remains unchanged.
+Add an optional Telegram interface to the stock MastraCode TUI as the separately published npm package `@srdjancoric/mastracode-telegram`. `mastracode-telegram --init` prepares its isolated runtime, and `mastracode-telegram` starts the normal TUI with Telegram attached to the same controller, session, and active thread. The package is built and published only from the monorepo's `mastracode/` workspace. The official `mastracode` package and executable remain unchanged and can coexist without being overwritten.
 
 The adjacent `../mastracode-remote` repository at baseline `3a68c86` is implementation input for Telegram setup, project registration, security, routing, and tests. The Mastra repository is the implementation and publication repository; do not modify the production checkout outside this workspace.
 
@@ -20,7 +20,7 @@ Repository isolation is explicit: the Mastra checkout pushes only to the `Srdjan
 
 ## Setup and skills
 
-- `--telegram-init` adapts the proven remote setup flow without installing launchd. It validates MastraCode authentication/model readiness, Git and author identity, GitHub CLI/repository readiness, Telegram credentials and private forum routing, managed workflow skills, isolated readiness state, and an end-to-end Telegram test.
+- `mastracode-telegram --init` adapts the proven remote setup flow without installing launchd. It validates MastraCode authentication/model readiness, Git and author identity, GitHub CLI/repository readiness, Telegram credentials and private forum routing, managed workflow skills, isolated readiness state, and an end-to-end Telegram test.
 - Skill discovery for this build is limited to `<project>/.mastracode/skills` and `~/.mastracode/skills`. `.claude/skills`, `.agents/skills`, and other agent-specific locations are excluded in both ordinary and Telegram-enabled runs.
 - The existing packaged-runtime patch is source material only. Its asynchronous policy resolution and scoped skill discovery behavior must be implemented in TypeScript source with focused tests, not by editing compiled `dist` files.
 

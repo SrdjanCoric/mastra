@@ -14,8 +14,8 @@ This is the project's master plan: a durable architectural header plus an ordere
 ## Architectural decisions
 
 - **Process model**: the stock TUI process owns one controller, session, active thread, and optional Telegram adapter; no PTY injection, second headless run, daemon, or attachable TUI.
-- **Commands**: `mastracode --telegram-init` prepares isolated state; `mastracode --telegram` starts the stock TUI with Telegram; ordinary invocation remains unchanged.
-- **Isolation**: experiment config, state, runtime identity, locks, logs, readiness markers, and Telegram resources are separate from production `mastracode-remote` state and services.
+- **Package and commands**: publish only the `mastracode/` workspace as `@srdjancoric/mastracode-telegram`; `mastracode-telegram --init` prepares isolated state and `mastracode-telegram` starts the stock TUI with Telegram. The official `mastracode` package and executable remain unchanged.
+- **Isolation**: experiment config, state, runtime identity, locks, logs, readiness markers, and Telegram resources are separate from production MastraCode and `mastracode-remote` state and services.
 - **Repository safety**: Mastra work pushes only to `SrdjanCoric/mastra`; bridge work pushes only to `SrdjanCoric/mastracode-remote-telegram`; both original repositories are fetch-only upstream remotes with disabled push URLs.
 - **Skills**: this build discovers skills only from project-local and global `.mastracode/skills` directories.
 - **Routing**: each canonical project maps to one persistent forum topic and permits one Telegram-enabled TUI owner; the topic follows the TUI's active thread.

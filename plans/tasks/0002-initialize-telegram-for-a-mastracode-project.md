@@ -6,7 +6,7 @@
 
 ## What to build
 
-Implement `mastracode --telegram-init` as an isolated, idempotent setup flow adapted from the adjacent remote bridge. It must validate MastraCode readiness, Git and GitHub prerequisites, Telegram credentials and authorization scope, install or verify workflow skills, map the canonical project to one forum topic, persist non-production readiness state, and complete an end-to-end Telegram connectivity test. It must not install or control launchd.
+Implement `mastracode-telegram --init` as an isolated, idempotent setup flow adapted from the adjacent remote bridge. It must validate MastraCode readiness, Git and GitHub prerequisites, Telegram credentials and authorization scope, install or verify workflow skills, map the canonical project to one forum topic, persist non-production readiness state, and complete an end-to-end Telegram connectivity test. It must not install or control launchd.
 
 ## AFK tasks
 

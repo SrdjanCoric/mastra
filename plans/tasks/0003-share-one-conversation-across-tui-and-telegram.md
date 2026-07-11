@@ -6,7 +6,7 @@
 
 ## What to build
 
-Implement the first complete `mastracode --telegram` happy path. The normal TUI must render and remain fully interactive while an in-process Telegram adapter polls the initialized project topic. Authorized Telegram text enters the active session's native follow-up queue, appears in the TUI with source metadata, and reaches the model unchanged. Every completed assistant message is delivered to Telegram regardless of which surface supplied the input.
+Implement the first complete `mastracode-telegram` happy path. The normal TUI must render and remain fully interactive while an in-process Telegram adapter polls the initialized project topic. Authorized Telegram text enters the active session's native follow-up queue, appears in the TUI with source metadata, and reaches the model unchanged. Every completed assistant message is delivered to Telegram regardless of which surface supplied the input.
 
 ## AFK tasks
 
@@ -17,7 +17,7 @@ Implement the first complete `mastracode --telegram` happy path. The normal TUI 
 
 ## Acceptance criteria
 
-- [ ] `mastracode --telegram` renders the stock TUI and starts exactly one adapter for the initialized canonical project.
+- [ ] `mastracode-telegram` renders the stock TUI and starts exactly one adapter for the initialized canonical project.
 - [ ] Terminal and Telegram messages share the same session and active thread.
 - [ ] Telegram messages received during a turn use the native follow-up queue and do not interrupt it.
 - [ ] Telegram-originated messages are identifiable in the TUI while model input remains the original text.
