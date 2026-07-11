@@ -29,3 +29,4 @@ Create the smallest complete CLI/runtime foundation for the separately published
 - Added the isolated npm/bin identity, Telegram CLI boundary, readiness guard, runtime path resolver, and source-level MastraCode-only skill scope.
 - Preserved the stock CLI entrypoint and updated package-root detection so existing plugin and headless behavior continues to work in the renamed package.
 - Verified with focused tests, all 1,979 MastraCode unit tests, lint, typecheck, build, invalid-readiness executable smoke tests, and an npm pack metadata/content check.
+- Merged in PR #1 with merge commit `8a124467926d9e71c9f1fcbc7b18a95fcd6f9d3e`.
