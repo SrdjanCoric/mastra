@@ -154,6 +154,144 @@ describe('MastraTUI queueing', () => {
     expect(tui.signalMessage).toHaveBeenCalledWith('continue from Telegram', undefined, { label: 'Telegram' });
   });
 
+  it('handles Telegram commands without forwarding them to the model', async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected' } },
+      session: { run: { isRunning: vi.fn(() => false) } },
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (text: string) => Promise<void>;
+    };
+    tui.state = state;
+
+    await tui.receiveExternalMessage('/help');
+    await tui.receiveExternalMessage('/models');
+
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendMessage.mock.calls[0]?.[0]).toContain('/status');
+    expect(sendMessage.mock.calls[1]?.[0]).toContain('terminal-only');
+  });
+
+  it('returns safe Telegram status without tool arguments or transcripts', async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected' } },
+      projectInfo: { name: 'example' },
+      currentThreadTitle: 'Current work',
+      session: {
+        run: { isRunning: vi.fn(() => true) },
+        displayState: {
+          get: () => ({
+            pendingApproval: { toolName: 'execute_command', args: { token: 'SECRET' } },
+            pendingSuspensions: new Map(),
+            activeTools: new Map(),
+            tasks: [],
+          }),
+        },
+        thread: { getId: () => '1234567890' },
+        model: { get: () => 'openai/gpt-5.4-mini' },
+        mode: { get: () => 'build' },
+        followUps: { count: () => 1 },
+      },
+      pendingQueuedActions: ['message'],
+      pendingSignalMessageComponentsById: new Map(),
+      userInitiatedAbort: false,
+      agentRunStartedAt: Date.now() - 1_000,
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (text: string) => Promise<void>;
+    };
+    tui.state = state;
+
+    await tui.receiveExternalMessage('/status');
+
+    const output = sendMessage.mock.calls[0]?.[0] as string;
+    expect(output).toContain('Current: tool: execute_command');
+    expect(output).toContain('Queued follow-ups: 2');
+    expect(output).not.toContain('SECRET');
+  });
+
+  it('stops active work and removes queued Telegram placeholders without closing the bridge', async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const stopBridge = vi.fn();
+    const abort = vi.fn();
+    const pendingApprovalDismiss = vi.fn();
+    const telegramComponent = {};
+    const terminalComponent = {};
+    const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected', stop: stopBridge } },
+      session: {
+        run: { isRunning: vi.fn(() => true) },
+        displayState: { get: () => ({ pendingApproval: null, pendingSuspensions: new Map() }) },
+        abort,
+      },
+      pendingSignalMessageComponentsById: new Map([
+        ['telegram-signal', { component: telegramComponent, text: 'remote', label: 'Telegram' }],
+        ['terminal-signal', { component: terminalComponent, text: 'local' }],
+      ]),
+      chatContainer: { removeChild: vi.fn(), invalidate: vi.fn() },
+      ui: { requestRender: vi.fn() },
+      userInitiatedAbort: false,
+      pendingApprovalDismiss,
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (text: string) => Promise<void>;
+    };
+    tui.state = state;
+
+    await tui.receiveExternalMessage('/stop');
+
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect(pendingApprovalDismiss).toHaveBeenCalledWith({ reason: 'telegram_stop', message: 'Stopped from Telegram.' });
+    expect(state.pendingSignalMessageComponentsById.has('telegram-signal')).toBe(false);
+    expect(state.pendingSignalMessageComponentsById.has('terminal-signal')).toBe(true);
+    expect(sendMessage).toHaveBeenCalledWith('Stopping active MastraCode work.');
+    expect(stopBridge).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['idle', false, null, 0, false, 'MastraCode is already idle.'],
+    ['suspended', false, { toolName: 'ask_user' }, 0, true, 'Stopping active MastraCode work.'],
+  ] as const)(
+    'handles /stop while %s',
+    async (_name, running, pendingApproval, suspensionCount, shouldAbort, reply) => {
+      const sendMessage = vi.fn().mockResolvedValue(undefined);
+      const abort = vi.fn();
+      const state = {
+        options: { messageBridge: { sendMessage, health: () => 'connected' } },
+        session: {
+          run: { isRunning: () => running },
+          displayState: {
+            get: () => ({
+              pendingApproval,
+              pendingSuspensions: new Map(Array.from({ length: suspensionCount }, (_, index) => [String(index), {}])),
+            }),
+          },
+          abort,
+        },
+        pendingSignalMessageComponentsById: new Map(),
+        chatContainer: { removeChild: vi.fn(), invalidate: vi.fn() },
+        ui: { requestRender: vi.fn() },
+        userInitiatedAbort: false,
+        pendingApprovalDismiss: null,
+      };
+      const tui = Object.create(MastraTUI.prototype) as {
+        state: typeof state;
+        receiveExternalMessage: (text: string) => Promise<void>;
+      };
+      tui.state = state;
+
+      await tui.receiveExternalMessage('/stop');
+
+      expect(abort).toHaveBeenCalledTimes(shouldAbort ? 1 : 0);
+      expect(sendMessage).toHaveBeenCalledWith(reply);
+    },
+  );
+
   it('starts an idle Telegram message in the current TUI session', async () => {
     const state = {
       session: {

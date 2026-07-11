@@ -96,6 +96,7 @@ export function getGithubPrSubscriptionsFromMetadata(
 export interface TUIMessageBridge {
   start(onMessage: (text: string) => Promise<void>): Promise<void>;
   sendMessage(text: string): Promise<void>;
+  health(): 'connected' | 'disconnected';
   stop(): void;
 }
 
