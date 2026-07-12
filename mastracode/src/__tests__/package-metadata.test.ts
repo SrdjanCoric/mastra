@@ -34,7 +34,7 @@ describe('mastracode package metadata', () => {
     const pkg = await readPackageJson();
 
     expect(pkg.name).toBe('mastracode-remote');
-    expect(pkg.version).toBe('0.2.0');
+    expect(pkg.version).toBe('0.2.1');
     expect(pkg.description).toBe(
       'MastraCode with Telegram. Run the normal terminal TUI and continue the same session from Telegram.',
     );

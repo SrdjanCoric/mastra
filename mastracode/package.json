@@ -1,6 +1,6 @@
 {
   "name": "mastracode-remote",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MastraCode with Telegram. Run the normal terminal TUI and continue the same session from Telegram.",
   "type": "module",
   "files": [
