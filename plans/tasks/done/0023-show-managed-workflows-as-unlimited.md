@@ -24,7 +24,7 @@ Make every managed-workflow goal projection and TUI judge display represent the 
 - [x] Render managed-workflow judge evaluations as `<n> runs, unlimited` while retaining `<n>/<max>` for bounded goals.
 - [x] Preserve `unbounded` when the TUI recreates or updates an objective record.
 - [x] Add or update focused unit and TUI E2E regression coverage.
-- [ ] Run automatic task review, close this task on the branch, merge one implementation/closeout PR, and sync `main`.
+- [x] Run automatic task review, close this task on the branch, merge one implementation/closeout PR, and sync `main`.
 
 ## Acceptance criteria
 
@@ -42,3 +42,4 @@ Make every managed-workflow goal projection and TUI judge display represent the 
 - Focused TUI tests passed: goal manager persistence/lifecycle, judge rendering, and goal timer coverage, 3 files / 26 tests; the final persistence rerun passed 14/14.
 - The checked-in `persistent-goal-judge-decision` scenario passed and now proves both live cards (`1 runs, unlimited`, `2 runs, unlimited`) plus model context containing `unbounded="true"` without a `maxRuns` attribute.
 - `pnpm check:mastracode` passed: build, formatting, lint, type checks, 209 unit files / 2,132 tests, integration tests, active-display performance gate, trusted-release verification, and packed-package isolation checks.
+- Automatic task review found no standards, specification, correctness, or security findings. Review independently checked the implementation against the task acceptance criteria and Software Repository Guidelines references 00, 01, 02, 06, and 10; security was skipped because the diff does not change a trust boundary.
