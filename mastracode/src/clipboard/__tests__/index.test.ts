@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  execFileSync: vi.fn(),
   execSync: vi.fn(),
   readFileSync: vi.fn(),
   unlinkSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
+  execFileSync: mocks.execFileSync,
   execSync: mocks.execSync,
 }));
 
@@ -19,6 +21,7 @@ import { getClipboardImage } from '../index.js';
 
 describe('getClipboardImage', () => {
   beforeEach(() => {
+    mocks.execFileSync.mockReset();
     mocks.execSync.mockReset();
     mocks.readFileSync.mockReset();
     mocks.unlinkSync.mockReset();
@@ -39,16 +42,22 @@ describe('getClipboardImage', () => {
     });
   });
 
-  it('falls back to TIFF clipboard coercion for macOS screenshots', () => {
+  it('converts the TIFF clipboard fallback to PNG for model compatibility', () => {
     mocks.execSync.mockImplementationOnce(() => {
       throw new Error('PNG clipboard coercion failed');
     });
     mocks.execSync.mockReturnValueOnce(undefined);
+    mocks.execFileSync.mockReturnValueOnce(Buffer.alloc(0));
 
     expect(getClipboardImage()).toEqual({
       data: Buffer.from('clipboard-image-binary').toString('base64'),
-      mimeType: 'image/tiff',
+      mimeType: 'image/png',
     });
+    expect(mocks.execFileSync).toHaveBeenCalledWith(
+      'sips',
+      expect.arrayContaining(['-s', 'format', 'png', '--out']),
+      expect.objectContaining({ stdio: ['pipe', 'pipe', 'pipe'] }),
+    );
   });
 
   it('returns null when direct macOS image coercions all fail', () => {
