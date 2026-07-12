@@ -52,4 +52,5 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0016 · Speed up MastraCode Remote CI and prepare 0.2.4 (after 0012) → tasks/done/0016-speed-up-mastracode-remote-ci.md (PR #22, `0fb0ceab`)
 - [x] 0017 · Start managed workflow as a persistent goal (after 0014) → tasks/done/0017-start-managed-workflow-as-a-goal.md
 - [ ] 0019 · Compact edit and search tool output (after 0012) → tasks/0019-compact-edit-and-search-tool-output.md
-- [ ] 0020 · Return while-active replies to Telegram (after 0013) → tasks/0020-return-while-active-replies-to-telegram.md
+- [x] 0020 · Return while-active replies to Telegram (after 0013) → tasks/done/0020-return-while-active-replies-to-telegram.md
+- [ ] 0021 · Fix terminal image prompts (after 0020) → tasks/0021-fix-terminal-image-prompts.md

@@ -240,7 +240,7 @@ describe('MastraTUI queueing', () => {
     expect(tui.signalMessage).toHaveBeenCalledWith(
       'continue from Telegram',
       undefined,
-      expect.objectContaining({ label: 'Telegram', onFailure: expect.any(Function) }),
+      expect.objectContaining({ label: 'Telegram', onFailure: expect.any(Function), replyOrigin: 'telegram' }),
     );
   });
 

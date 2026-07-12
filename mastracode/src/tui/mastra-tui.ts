@@ -60,6 +60,8 @@ import { dispatchEvent } from './event-dispatch.js';
 import { isGoalJudgeInputLocked, showGoalJudgeInputLockInfo } from './goal-input-lock.js';
 import type { EventHandlerContext } from './handlers/types.js';
 import { InteractivePromptBridge } from './interactive-prompt-bridge.js';
+import { InterjectionReplyTracker, shouldSendAssistantReplyToTelegram } from './interjection-reply-tracker.js';
+import type { InterjectionReplyOrigin } from './interjection-reply-tracker.js';
 import { parseManagedWorkflowGoal } from './managed-workflow-goal.js';
 import { askModalQuestion } from './modal-question.js';
 import { showModalOverlay } from './overlay.js';
@@ -172,8 +174,13 @@ export class MastraTUI {
   private cleanupKeyHandlers?: () => void;
   private cleanupPluginReloadListener?: () => void;
   private lastStreamError: string | null = null;
+  private interjectionReplyTracker?: InterjectionReplyTracker;
 
   private static readonly DOUBLE_CTRL_C_MS = 500;
+
+  private getInterjectionReplyTracker(): InterjectionReplyTracker {
+    return (this.interjectionReplyTracker ??= new InterjectionReplyTracker());
+  }
 
   constructor(options: MastraTUIOptions) {
     this.state = createTUIState(options);
@@ -540,7 +547,7 @@ export class MastraTUI {
   private signalMessage(
     content: string,
     images?: Array<{ data: string; mimeType: string }>,
-    options?: { label?: string; onFailure?: () => void },
+    options?: { label?: string; onFailure?: () => void; replyOrigin?: InterjectionReplyOrigin },
   ): void {
     const hasActiveRun = this.state.session.stream.isActive();
 
@@ -556,6 +563,9 @@ export class MastraTUI {
       });
 
       if (hasActiveRun) {
+        if (this.state.options?.messageBridge) {
+          this.getInterjectionReplyTracker().track(signal.id, options?.replyOrigin ?? 'terminal');
+        }
         addPendingUserMessage(this.state, signal.id, content, images, {
           isInterjection: true,
           label: options?.label,
@@ -568,6 +578,7 @@ export class MastraTUI {
 
       signal.accepted.catch((error: unknown) => {
         if (hasActiveRun) {
+          this.getInterjectionReplyTracker().discard(signal.id);
           removePendingUserMessage(this.state, signal.id);
         } else {
           this.removeOptimisticUserMessage(signal.id);
@@ -693,7 +704,7 @@ export class MastraTUI {
     };
 
     if (isRunning) {
-      this.signalMessage(content, undefined, { label: 'Telegram', onFailure });
+      this.signalMessage(content, undefined, { label: 'Telegram', onFailure, replyOrigin: 'telegram' });
       return;
     }
     if (await this.startManagedWorkflowGoalIfRequested(content, { label: 'Telegram', onRejected: onFailure })) {
@@ -981,6 +992,7 @@ export class MastraTUI {
     }
 
     try {
+      this.getInterjectionReplyTracker().observe(event);
       this.fireLifecycleHooksForEvent(event);
       await dispatchEvent(event, this.getEventContext(), this.state);
       this.captureAgentControllerAnalytics(event);
@@ -991,12 +1003,15 @@ export class MastraTUI {
           .join('')
           .trim();
         if (text) {
-          this.state.options.messageBridge.sendMessage(text).catch(error => {
-            showInfo(
-              this.state,
-              `Telegram delivery failed; continuing locally: ${error instanceof Error ? error.message : String(error)}`,
-            );
-          });
+          const replyOrigin = this.getInterjectionReplyTracker().consume();
+          if (shouldSendAssistantReplyToTelegram(replyOrigin)) {
+            this.state.options.messageBridge.sendMessage(text).catch(error => {
+              showInfo(
+                this.state,
+                `Telegram delivery failed; continuing locally: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            });
+          }
         }
       }
 
