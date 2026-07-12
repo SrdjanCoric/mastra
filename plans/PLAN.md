@@ -37,7 +37,7 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0003 · Share one conversation across the TUI and Telegram (after 0002) → tasks/done/0003-share-one-conversation-across-tui-and-telegram.md (PR #3, `e29e7fd9`)
 - [x] 0004 · Add thread routing and Telegram session commands (after 0003) → tasks/done/0004-add-thread-routing-and-telegram-session-commands.md (PR #4, `857bd9a6`)
 - [x] 0005 · Resolve questions and approvals from either surface (after 0004) → tasks/done/0005-resolve-questions-and-approvals-from-either-surface.md (PR #5, `9860eb39`)
-- [~] 0006 · Recover safely from Telegram and process failures (after 0005) → tasks/0006-recover-safely-from-telegram-and-process-failures.md
+- [>] 0006 · Recover safely from Telegram and process failures (after 0005) → tasks/0006-recover-safely-from-telegram-and-process-failures.md (PR #8)
 - [ ] 0008 · Bound shell-output rendering (after 0005) → tasks/0008-bound-shell-output-rendering.md
 - [ ] 0009 · Adopt the MastraCode Remote product identity (after 0008) → tasks/0009-adopt-the-mastracode-remote-product-identity.md
 - [ ] 0007 · Prove and document the publishable package (after 0006, 0009) → tasks/0007-prove-and-document-the-publishable-package.md
