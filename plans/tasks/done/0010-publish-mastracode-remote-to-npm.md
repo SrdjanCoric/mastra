@@ -45,3 +45,6 @@ Completed on 2026-07-12.
 - Focused verification passed 21 tests in 5 files for package metadata, CLI help, guided init, and setup. The checked-in `startup` TUI scenario also passed.
 - Brownfield review found no blocking, major, minor, or security findings. Changes stayed within the MastraCode package and required release/task metadata; no Mastra framework package was modified.
 - Merged in PR #12 with merge commit `7f1ac495c190a1349b85704b46d634ff40eb6e35`.
+- Follow-up PR #13 fixed nested project initialization so the working directory keeps its own Telegram topic while Git and GitHub checks use the enclosing repository root. PR #14 prepared patch release `0.2.1`.
+- Published `mastracode-remote@0.2.1` under `latest`. Registry verification reported integrity `sha512-XfU2UdPNd6wklw2CBuLL0PBqpC1J4PGIklDIZDl70jqmi5mcbKut+CY0PAFKvq3POf0lCoCEe5KozZ/pTiqzzQ==` and SHA-1 `8c25e00a3736b979259807596216a182cd20ab43`.
+- A clean registry install of `0.2.1` passed. The installed package reported the correct version, and the executable displayed help before initialization without creating legacy state.
