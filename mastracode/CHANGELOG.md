@@ -1,5 +1,17 @@
 # mastracode-remote
 
+## 0.2.4
+
+### Fixed
+
+- Reduced CPU and retained memory during active tasks by bounding live display state and batching intermediate shell, tool, and subagent updates.
+- Kept lifecycle events, errors, prompts, approvals, cancellation, and final results immediate while noisy output is active.
+
+### Changed
+
+- Split the required MastraCode Remote CI gate into parallel quality, test, package, dependency-review, and CodeQL jobs while preserving one required aggregate result.
+- Removed plan-only changes from the package CI trigger.
+
 ## 0.2.3
 
 ### Fixed

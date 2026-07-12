@@ -1,5 +1,4 @@
 ---
-'mastracode-remote': patch
 '@mastra/core': patch
 ---
 
