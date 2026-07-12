@@ -1,5 +1,12 @@
 # mastracode-remote
 
+## 0.2.2
+
+### Documentation
+
+- Removed tmux guidance because persistent background operation is not a supported MastraCode Remote feature.
+- Documented the bundled workflow, including the existing CPU and memory controls for noisy command output.
+
 ## 0.2.1
 
 ### Fixed

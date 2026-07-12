@@ -7,6 +7,7 @@ The npm package and executable are both named `mastracode-remote`.
 ## What it does
 
 - Runs the standard MastraCode TUI in your terminal.
+- Keeps live command output bounded and batches display updates so noisy commands use less CPU and memory.
 - Connects one private Telegram forum topic to the current project.
 - Sends completed assistant responses and interactive prompts to Telegram.
 - Routes Telegram messages into the same MastraCode session and follow-up queue.
@@ -67,6 +68,26 @@ mastracode-remote
 
 Use the terminal TUI normally. Messages sent in the project topic enter the same conversation. Telegram messages that arrive during an active run use MastraCode's follow-up queue.
 
+## Recommended workflow
+
+`mastracode-remote --init` installs the custom workflow skills shipped with the package. For most project work, launch MastraCode Remote and tell it:
+
+```text
+mastra workflow
+```
+
+The workflow settles the design with you, writes a task plan, and works through implementation, review, pull request merge, and local sync.
+
+If a task plan already exists, tell it:
+
+```text
+mastra workflow --run
+```
+
+The `--run` option skips the interview and planning stages and starts with the unfinished tasks.
+
+Rerun `mastracode-remote --init` to restore or update the packaged workflow skills. Local changes to a packaged skill are backed up before replacement.
+
 ## Telegram commands
 
 | Command   | Behavior                                                                                                                                         |
@@ -114,19 +135,6 @@ mastracode-remote service uninstall
 Then install the current package and run `mastracode-remote --init` in each project. Keep `~/.mastracode-remote/` until you have confirmed that you no longer need the old configuration or logs. The current package only uses `~/.mastracode-telegram/`.
 
 Bot secrets are stored separately with owner-only file permissions. Do not commit either runtime directory or copy secret files into a project.
-
-## Managed skills
-
-The npm archive contains the managed workflow skills under `assets/skills`. `mastracode-remote --init` copies them into `~/.mastracode/skills/` and backs up local changes before replacing a managed skill. The package does not use a `postinstall` script.
-
-This distribution discovers skills only from:
-
-```text
-<project>/.mastracode/skills
-~/.mastracode/skills
-```
-
-It does not load `.claude/skills` or `.agents/skills`.
 
 ## Troubleshooting
 
