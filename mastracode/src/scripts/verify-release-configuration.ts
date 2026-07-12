@@ -46,6 +46,10 @@ async function main(): Promise<void> {
     ciWorkflow.includes('Only plan files changed; package checks are not required.'),
     'Plan-only changes must bypass expensive package jobs.',
   );
+  assert(
+    ciWorkflow.includes("grep -qv '^plans/'") && !ciWorkflow.includes("! grep -qv '^plans/'"),
+    'Any non-plan file must enable package checks.',
+  );
   assert(ciWorkflow.includes('github/codeql-action/analyze@'), 'MastraCode CI must include scoped CodeQL analysis.');
   assert(releaseWorkflow.includes('workflow_dispatch:'), 'Releases must require a manual workflow dispatch.');
   assert(

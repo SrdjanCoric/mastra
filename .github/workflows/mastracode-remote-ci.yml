@@ -116,7 +116,7 @@ jobs:
             exit 0
           fi
           changed_files=$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")
-          if [ -n "$changed_files" ] && ! grep -qv '^plans/' <<< "$changed_files"; then
+          if [ -n "$changed_files" ] && grep -qv '^plans/' <<< "$changed_files"; then
             echo "run-package-checks=true" >> "$GITHUB_OUTPUT"
           else
             echo "run-package-checks=false" >> "$GITHUB_OUTPUT"
