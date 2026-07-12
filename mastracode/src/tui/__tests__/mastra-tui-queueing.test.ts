@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   addUserMessage: vi.fn(),
   showInfo: vi.fn(),
   showError: vi.fn(),
+  startGoalWithDefaults: vi.fn(),
 }));
 
 vi.mock('../render-messages.js', async importOriginal => {
@@ -22,6 +23,14 @@ vi.mock('../display.js', () => ({
   showFormattedError: vi.fn(),
   notify: vi.fn(),
 }));
+
+vi.mock('../commands/goal.js', async importOriginal => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    startGoalWithDefaults: mocks.startGoalWithDefaults,
+  };
+});
 
 import { GOAL_JUDGE_INPUT_LOCK_MESSAGE } from '../goal-input-lock.js';
 import { handleAgentAborted, handleAgentEnd, handleGoalEvaluation } from '../handlers/agent-lifecycle.js';
@@ -132,6 +141,40 @@ describe('MastraTUI queueing', () => {
     mocks.addUserMessage.mockReset();
     mocks.showInfo.mockReset();
     mocks.showError.mockReset();
+    mocks.startGoalWithDefaults.mockReset().mockResolvedValue(undefined);
+  });
+
+  it('starts the documented managed workflow prompt as a persistent goal', async () => {
+    const state = createQueueState({
+      session: {
+        run: { isRunning: vi.fn(() => false) },
+        model: { hasSelection: vi.fn(() => true) },
+      } as unknown as TUIState['session'],
+    });
+    const commandContext = { state };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: TUIState;
+      startManagedWorkflowGoalIfRequested: (content: string, options?: { label?: string }) => Promise<boolean>;
+      runUserPromptHook: (content: string) => Promise<boolean>;
+      buildCommandContext: () => typeof commandContext;
+    };
+    tui.state = state;
+    tui.runUserPromptHook = vi.fn().mockResolvedValue(true);
+    tui.buildCommandContext = vi.fn(() => commandContext);
+
+    const handled = await tui.startManagedWorkflowGoalIfRequested('mastra workflow --run', { label: 'Telegram' });
+
+    expect(handled).toBe(true);
+    expect(mocks.addUserMessage).toHaveBeenCalledWith(
+      state,
+      expect.objectContaining({ role: 'user', content: [{ type: 'text', text: 'mastra workflow --run' }] }),
+      { label: 'Telegram' },
+    );
+    expect(mocks.startGoalWithDefaults).toHaveBeenCalledWith(
+      commandContext,
+      'mastra workflow --run',
+      'Workflow cancelled.',
+    );
   });
 
   it('routes Telegram text through the native follow-up signal while a turn is running', async () => {

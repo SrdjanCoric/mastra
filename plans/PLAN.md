@@ -50,3 +50,4 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0014 · Debug Mastra workflow continuation (after 0016) → tasks/done/0014-debug-mastra-workflow-continuation.md (PR #25, `5d316eab`)
 - [ ] 0015 · Acknowledge every Telegram message (after 0014) → tasks/0015-acknowledge-every-telegram-message.md
 - [x] 0016 · Speed up MastraCode Remote CI and prepare 0.2.4 (after 0012) → tasks/done/0016-speed-up-mastracode-remote-ci.md (PR #22, `0fb0ceab`)
+- [x] 0017 · Start managed workflow as a persistent goal (after 0014) → tasks/done/0017-start-managed-workflow-as-a-goal.md

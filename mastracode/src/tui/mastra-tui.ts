@@ -58,6 +58,7 @@ import { dispatchEvent } from './event-dispatch.js';
 import { isGoalJudgeInputLocked, showGoalJudgeInputLockInfo } from './goal-input-lock.js';
 import type { EventHandlerContext } from './handlers/types.js';
 import { InteractivePromptBridge } from './interactive-prompt-bridge.js';
+import { parseManagedWorkflowGoal } from './managed-workflow-goal.js';
 import { askModalQuestion } from './modal-question.js';
 import { showModalOverlay } from './overlay.js';
 import { promptForApiKeyIfNeeded } from './prompt-api-key.js';
@@ -361,6 +362,10 @@ export class MastraTUI {
           continue;
         }
 
+        if (await this.startManagedWorkflowGoalIfRequested(userInput)) {
+          continue;
+        }
+
         // Check if a model is selected (sync — fast, no reason to defer)
         if (!this.state.session.model.hasSelection()) {
           showInfo(this.state, 'No model selected. Use /models to select a model, or /login to authenticate.');
@@ -491,6 +496,29 @@ export class MastraTUI {
       this.removeOptimisticUserMessage(optimisticMessageId);
       showError(this.state, error instanceof Error ? error.message : 'Unknown error');
     });
+  }
+
+  private async startManagedWorkflowGoalIfRequested(content: string, options?: { label?: string }): Promise<boolean> {
+    const objective = parseManagedWorkflowGoal(content);
+    if (!objective || this.state.session.run.isRunning()) return false;
+
+    if (!this.state.session.model.hasSelection()) {
+      showInfo(this.state, 'No model selected. Use /models to select a model, or /login to authenticate.');
+      return true;
+    }
+
+    const messageId = `user-${Date.now()}`;
+    addUserMessage(this.state, this.createUserSignalMessage(content, undefined, messageId), options);
+    this.state.ui.requestRender();
+
+    const allowed = await this.runUserPromptHook(content);
+    if (!allowed) {
+      this.removeOptimisticUserMessage(messageId);
+      return true;
+    }
+
+    await startGoalWithDefaults(this.buildCommandContext(), objective, 'Workflow cancelled.');
+    return true;
   }
 
   private signalMessage(
@@ -633,6 +661,9 @@ export class MastraTUI {
 
     if (this.state.session.run.isRunning()) {
       this.signalMessage(content, undefined, { label: 'Telegram' });
+      return;
+    }
+    if (await this.startManagedWorkflowGoalIfRequested(content, { label: 'Telegram' })) {
       return;
     }
     if (!this.state.session.model.hasSelection()) {
