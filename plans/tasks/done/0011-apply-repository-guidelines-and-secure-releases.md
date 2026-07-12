@@ -20,12 +20,12 @@ Keep this task out of the TUI, Telegram, tool-execution, skill-sync, and stored-
 - [x] Existing linting, formatting, strict typing, hooks, and test configuration are reused. Add a compatible root `.editorconfig` because the repository does not have one.
 - [x] Dead-code and dependency checks use the narrowest practical MastraCode scope, with explicit exclusions for generated files, bundled skills, and public extension surfaces.
 - [x] Publication verification records archive integrity and size so unexpected package-content or size changes are visible before release.
-- [ ] `main` requires the fork-owned CI check and pull-request review. Force pushes and branch deletion are blocked.
+- [x] `main` requires the fork-owned CI check and pull-request review. Force pushes and branch deletion are blocked.
 - [x] Repository ownership names the actual fork maintainer instead of upstream maintainers who do not administer this repository.
 - [x] Dependency vulnerability monitoring and prioritized security updates are enabled without activating unrelated inherited workflows.
 - [x] Secret scanning and push protection remain enabled, and publication does not require a long-lived npm token stored in GitHub or the repository.
 - [x] A committed security policy explains private vulnerability reporting and supported release handling.
-- [ ] npm publication is traceable to a commit, package version, archive integrity, workflow run, and provenance statement.
+- [x] npm publication is traceable to a commit, package version, archive integrity, workflow run, and provenance statement.
 
 ## AFK tasks
 
@@ -45,21 +45,21 @@ Keep this task out of the TUI, Telegram, tool-execution, skill-sync, and stored-
 
 ## Human-in-the-loop tasks
 
-- [ ] [confirm-security] Approve changing GitHub Actions permissions, workflow enablement, branch protection, dependency security updates, npm trusted-publisher authorization, and npm account publication requirements after the committed workflows and exact permission changes are shown. These actions change external trust boundaries and package publication authority.
+- [x] [confirm-security] Approve changing GitHub Actions permissions, workflow enablement, branch protection, dependency security updates, npm trusted-publisher authorization, and npm account publication requirements after the committed workflows and exact permission changes are shown. These actions change external trust boundaries and package publication authority.
 
 ## Acceptance criteria
 
-- [ ] A pull request changing MastraCode cannot merge until the fork-owned required check passes.
-- [ ] Inherited workflows that depend on Mastra's private runners remain disabled in `SrdjanCoric/mastra`.
-- [ ] `main` rejects force pushes and deletion and requires pull-request validation.
-- [ ] GitHub reports `SrdjanCoric` as the effective code owner for repository changes.
-- [ ] Secret scanning, push protection, dependency security updates, and the scoped security workflow are enabled.
-- [ ] npm shows no unexpected maintainer, publication requires strong authentication, and the trusted publisher is restricted to the intended repository and release workflow.
-- [ ] A non-publishing proof verifies archive contents, integrity, size, provenance arguments, and the absence of install lifecycle scripts.
-- [ ] The security policy gives reporters a private route and identifies the supported `0.2.x` release line.
-- [ ] The checked-in application regression suite and package smoke test pass without changing TUI, Telegram, skills, state, or execution behavior.
-- [ ] Existing uncommitted `0.2.2` release edits are preserved and are not mixed into this task's implementation commit.
-- [ ] Task 0011 is merged and closed before task 0012 starts, then the workflow pauses so the user can test the app.
+- [x] A pull request changing MastraCode cannot merge until the fork-owned required check passes.
+- [x] Inherited workflows that depend on Mastra's private runners remain disabled in `SrdjanCoric/mastra`.
+- [x] `main` rejects force pushes and deletion and requires pull-request validation.
+- [x] GitHub reports `SrdjanCoric` as the effective code owner for repository changes.
+- [x] Secret scanning, push protection, dependency security updates, and the scoped security workflow are enabled.
+- [x] npm shows no unexpected maintainer, publication requires strong authentication, and the trusted publisher is restricted to the intended repository and release workflow.
+- [x] A non-publishing proof verifies archive contents, integrity, size, provenance arguments, and the absence of install lifecycle scripts.
+- [x] The security policy gives reporters a private route and identifies the supported `0.2.x` release line.
+- [x] The checked-in application regression suite and package smoke test pass without changing TUI, Telegram, skills, state, or execution behavior.
+- [x] Existing uncommitted `0.2.2` release edits are preserved and are not mixed into this task's implementation commit.
+- [x] Task 0011 is merged and closed before task 0012 starts, then the workflow pauses so the user can test the app.
 
 ## Implementation log
 
@@ -71,3 +71,7 @@ Keep this task out of the TUI, Telegram, tool-execution, skill-sync, and stored-
 - Verified `pnpm check:mastracode`. The unit suite passed with 205 files and 2,090 tests. The two Telegram TUI integration scenarios passed, the 50-task MastraCode dependency build passed, and package verification produced a 2.46 MB archive below the 5 MB compressed budget. CI caches Turbo output after the first clean build so later branch runs can reuse those artifacts.
 - Recorded the minor stale command-border artifact reported after task 0008 in task 0012. It is a display cleanup issue and does not affect command execution or task 0011.
 - Repaired the `0.2.2` publication regression caused by publishing the workspace directly instead of publishing the verified `pnpm pack` archive. Release verification now rejects unresolved `workspace:` and `catalog:` dependency protocols, accepts an explicit archive path, installs that exact archive with npm, and runs against the same archive the release workflow publishes. The prepared `0.2.3` archive passed the isolated install check.
+- Protected `main` with the required `Validate package` check, pull-request validation, conversation resolution, admin enforcement, and force-push and deletion blocks. GitHub Actions is restricted to the fork workflows and approved actions.
+- Confirmed the npm trusted publisher uses GitHub Actions for `SrdjanCoric/mastra`, workflow `mastracode-remote-release.yml`, environment `npm-release`, and publish-only permission. Version `0.2.3` was published manually as an emergency replacement for the broken `0.2.2`; future releases use the protected workflow with provenance.
+- PR #17 merged the repository and release safeguards at `5e36485b973582979126ee814a983653bd6ac161`. PR #18 merged the exact-artifact repair at `10908151c37c8d319bb5579a0a8bce2c630399cf`. Both required GitHub checks passed.
+- No further README change was needed for the repair. The existing release section already documents the protected workflow, trusted publisher, exact archive, and provenance path.

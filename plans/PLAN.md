@@ -44,5 +44,5 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0009 · Adopt the MastraCode Remote product identity (after 0008) → tasks/done/0009-adopt-the-mastracode-remote-product-identity.md (PR #10, `54b688fb`)
 - [x] 0007 · Prove and document the publishable package (after 0006, 0009) → tasks/done/0007-prove-and-document-the-publishable-package.md (PR #11, `1618e6b3`)
 - [x] 0010 · Publish MastraCode Remote to npm (after 0007) → tasks/done/0010-publish-mastracode-remote-to-npm.md (PR #12, `7f1ac495`)
-- [~] 0011 · Apply repository guidelines and secure releases → tasks/0011-apply-repository-guidelines-and-secure-releases.md
+- [x] 0011 · Apply repository guidelines and secure releases → tasks/done/0011-apply-repository-guidelines-and-secure-releases.md (PR #17, `5e36485b`; repair PR #18, `10908151`)
 - [ ] 0012 · Reduce active-task CPU and memory use (after 0011) → tasks/0012-reduce-active-task-cpu-and-memory.md
