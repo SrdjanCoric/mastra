@@ -791,6 +791,7 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
 
   private getQuietActivePreview(): string {
     if (this.isErrorResult()) return this.formatQuietErrorPreview();
+    if (this.usesCompactActivityOnly()) return '';
     if (isWebSearchTool(this.toolName)) return this.formatQuietWebSearchPreview();
     if (isBrowserTool(this.toolName)) return this.formatQuietBrowserPreview();
     if (isSkillTool(this.toolName)) return this.formatQuietSkillPreview();
@@ -800,16 +801,10 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     switch (this.toolName) {
       case MC_TOOLS.VIEW:
         return this.formatQuietViewPreview();
-      case MC_TOOLS.FIND_FILES:
-        return this.formatQuietListPreview();
       case 'skill':
         return '';
-      case MC_TOOLS.STRING_REPLACE_LSP:
-        return this.formatQuietEditPreview();
       case MC_TOOLS.WRITE_FILE:
         return this.getMultilinePreview('content', Number.POSITIVE_INFINITY, false);
-      case MC_TOOLS.SEARCH_CONTENT:
-        return this.formatSearchDetail();
       case MC_TOOLS.LSP_INSPECT:
         return this.getFirstLineArg('match', 80);
       default:
@@ -817,10 +812,12 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     }
   }
 
-  private formatQuietEditPreview(): string {
+  private usesCompactActivityOnly(): boolean {
     return (
-      this.getMultilinePreview('new_str', Number.POSITIVE_INFINITY, false) ||
-      this.getMultilinePreview('new_string', Number.POSITIVE_INFINITY, false)
+      this.toolName === MC_TOOLS.STRING_REPLACE_LSP ||
+      this.toolName === MC_TOOLS.AST_SMART_EDIT ||
+      this.toolName === MC_TOOLS.SEARCH_CONTENT ||
+      this.toolName === MC_TOOLS.FIND_FILES
     );
   }
 
@@ -845,15 +842,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     const viewRange = argsObj?.view_range as [number, number] | undefined;
     const startLine = viewRange?.[0] ?? (argsObj?.offset as number | undefined) ?? 1;
     return getPlainCodeFromViewOutput(output, startLine);
-  }
-
-  private formatQuietListPreview(): string {
-    if (!this.result) return '';
-
-    const entries = this.getListResultEntries();
-    if (entries.length === 0) return '';
-
-    return entries.slice(0, 2).join('\n');
   }
 
   private formatQuietWebSearchPreview(): string {
@@ -1222,14 +1210,35 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
   }
 
   private formatListSummary(): string {
-    const target = this.getFirstStringArg('path') || this.getFirstStringArg('pattern');
+    const pattern = this.formatPatternArg('pattern');
+    const path = this.getFirstStringArg('path') || '.';
+    const target = [pattern, path].filter(Boolean).join(' · ');
     const resultCount = this.result ? this.getListResultEntries().length : undefined;
     if (resultCount === undefined) return target;
     return `${target} (${resultCount} ${resultCount === 1 ? 'result' : 'results'})`;
   }
 
   private formatSearchSummary(): string {
-    return this.getFirstStringArg('path');
+    const pattern = this.formatPatternArg('pattern');
+    const path = this.getFirstStringArg('path') || '.';
+    const target = [pattern, path].filter(Boolean).join(' · ');
+    const resultCount = this.getSearchResultCount();
+    return resultCount === undefined
+      ? target
+      : `${target} (${resultCount} ${resultCount === 1 ? 'result' : 'results'})`;
+  }
+
+  private formatPatternArg(key: string): string {
+    const argsObj = this.args as Record<string, unknown> | undefined;
+    const value = argsObj?.[key];
+    if (typeof value === 'string') return JSON.stringify(value);
+    if (Array.isArray(value)) {
+      return value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map(entry => JSON.stringify(entry))
+        .join(', ');
+    }
+    return '';
   }
 
   private formatWebSearchSummary(): string {
@@ -1318,14 +1327,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
       default:
         return '';
     }
-  }
-
-  private formatSearchDetail(): string {
-    const pattern = this.getFirstStringArg('pattern');
-    if (!pattern) return '';
-
-    const resultCount = this.getSearchResultCount();
-    return resultCount === undefined ? pattern : `${pattern} (${resultCount} results)`;
   }
 
   private getSearchResultCount(): number | undefined {
