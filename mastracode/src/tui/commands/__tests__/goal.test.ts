@@ -139,7 +139,13 @@ vi.mock('../../prompt-api-key.js', () => ({
 
 import { createMockState } from '../../__tests__/agent-controller-mock.js';
 import { DEFAULT_MAX_TURNS, GoalManager } from '../../goal-manager.js';
-import { createGoalReminderMessage, handleGoalCommand, handleJudgeCommand, startGoalWithDefaults } from '../goal.js';
+import {
+  createGoalReminderMessage,
+  handleGoalCommand,
+  handleJudgeCommand,
+  startGoalWithDefaults,
+  startManagedWorkflowGoal,
+} from '../goal.js';
 
 describe('createGoalReminderMessage', () => {
   it('creates a canonical goal system reminder for chat history', () => {
@@ -354,6 +360,52 @@ describe('handleGoalCommand', () => {
       contents: '# Ship it\n\n1. Build\n2. Test',
       attributes: { type: 'goal' },
       metadata: { goalId: 'goal-1', maxTurns: 50, judgeModelId: '__GATEWAY_OPENAI_MODEL__' },
+    });
+  });
+
+  it('starts managed workflows with the selected session model and no run cap', async () => {
+    const objective = 'mastra workflow --run';
+    const goal = {
+      id: 'goal-1',
+      objective,
+      status: 'active' as const,
+      turnsUsed: 0,
+      maxTurns: 50,
+      unbounded: true,
+      judgeModelId: '__GATEWAY_OPENAI_MODEL__',
+    };
+    const goalManager = {
+      setGoal: vi.fn().mockResolvedValue(goal),
+      persistOnNextThreadCreate: vi.fn(),
+      saveToThread: vi.fn().mockResolvedValue(undefined),
+    };
+    const sendSignal = vi.fn(() => ({ accepted: Promise.resolve({ accepted: true, runId: 'run-1' }) }));
+    const ctx = {
+      state: createMockState({
+        threadId: 'thread-1',
+        session: { sendSignal },
+        extra: { pendingNewThread: false, goalManager },
+      }),
+      addUserMessage: vi.fn(),
+      showError: vi.fn(),
+      updateStatusLine: vi.fn(),
+    } as any;
+
+    await startManagedWorkflowGoal(ctx, objective, '__GATEWAY_OPENAI_MODEL__');
+
+    expect(goalManager.setGoal).toHaveBeenCalledWith(expect.anything(), objective, '__GATEWAY_OPENAI_MODEL__', 50, {
+      unbounded: true,
+    });
+    expect(sendSignal).toHaveBeenCalledWith({
+      type: 'system-reminder',
+      contents: objective,
+      attributes: { type: 'goal' },
+      metadata: {
+        goalId: 'goal-1',
+        maxTurns: 50,
+        unbounded: true,
+        judgeModelId: '__GATEWAY_OPENAI_MODEL__',
+      },
     });
   });
 

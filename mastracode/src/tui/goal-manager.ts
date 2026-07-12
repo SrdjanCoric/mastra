@@ -36,6 +36,7 @@ export interface GoalState {
   status: GoalStatus;
   turnsUsed: number;
   maxTurns: number;
+  unbounded: boolean;
   judgeModelId: string;
   startedAt: string;
   activeStartedAt?: string;
@@ -67,13 +68,14 @@ export class GoalManager {
 
   getGoal(): GoalState | null {
     if (!this.record) return null;
-    const { judgeModelId, maxTurns } = this.effectiveSettings(this.record);
+    const { judgeModelId, maxTurns, unbounded } = this.effectiveSettings(this.record);
     return {
       id: this.record.id,
       objective: this.record.objective,
       status: this.record.status,
       turnsUsed: this.record.runsUsed,
       maxTurns,
+      unbounded,
       judgeModelId,
       startedAt: new Date(this.record.startedAt).toISOString(),
       activeStartedAt: this.activeStartedAt ?? undefined,
@@ -130,6 +132,7 @@ export class GoalManager {
     objective: string,
     judgeModelId: string,
     maxTurns: number = DEFAULT_MAX_TURNS,
+    options: { unbounded?: boolean } = {},
   ): Promise<GoalState | null> {
     const threadId = state.session.thread.getId();
     const agent = this.getAgent(state);
@@ -143,12 +146,13 @@ export class GoalManager {
         resourceId: state.session.identity.getResourceId(),
         ...(judgeModelId ? { judgeModelId } : {}),
         maxRuns: maxTurns,
+        ...(options.unbounded ? { unbounded: true } : {}),
       });
       this.record = persisted
         ? { ...persisted, id: persisted.id ?? id }
-        : this.localRecord(objective, judgeModelId, maxTurns, now, id);
+        : this.localRecord(objective, judgeModelId, maxTurns, now, id, options.unbounded === true);
     } else {
-      this.record = this.localRecord(objective, judgeModelId, maxTurns, now, id);
+      this.record = this.localRecord(objective, judgeModelId, maxTurns, now, id, options.unbounded === true);
     }
 
     this.activeStartedAt = new Date(now).toISOString();
@@ -343,11 +347,16 @@ export class GoalManager {
   }
 
   /** Resolve effective judge model + max runs (record value → settings default). */
-  private effectiveSettings(record: GoalObjectiveRecord): { judgeModelId: string; maxTurns: number } {
+  private effectiveSettings(record: GoalObjectiveRecord): {
+    judgeModelId: string;
+    maxTurns: number;
+    unbounded: boolean;
+  } {
     const settings = loadSettings();
     return {
       judgeModelId: record.judgeModelId ?? settings.models.goalJudgeModel ?? '',
       maxTurns: record.maxRuns ?? settings.models.goalMaxTurns ?? DEFAULT_MAX_TURNS,
+      unbounded: record.unbounded === true,
     };
   }
 
@@ -357,12 +366,14 @@ export class GoalManager {
     maxTurns: number,
     now: number,
     id: string,
+    unbounded: boolean,
   ): GoalObjectiveRecord & { id: string } {
     return {
       objective,
       status: 'active',
       runsUsed: 0,
       maxRuns: maxTurns,
+      ...(unbounded ? { unbounded: true } : {}),
       ...(judgeModelId ? { judgeModelId } : {}),
       startedAt: now,
       updatedAt: now,

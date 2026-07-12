@@ -421,8 +421,10 @@ export interface GoalEvaluationPayload {
   objective: string;
   /** Goal evaluations consumed so far (runsUsed after this evaluation). */
   iteration: number;
-  /** Max evaluations before the goal stops. */
+  /** Max evaluations before the goal stops. Ignored when `unbounded` is true. */
   maxRuns: number;
+  /** Whether the goal has no evaluation budget. */
+  unbounded?: boolean;
   /** Whether the goal is judged complete. */
   passed: boolean;
   /** The objective status after this evaluation. */

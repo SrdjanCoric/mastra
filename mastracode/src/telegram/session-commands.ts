@@ -58,6 +58,25 @@ export function formatUnsupportedTelegramCommand(command: string): string {
   return `Unsupported Telegram command or arguments: ${command}. Use /help here; thread, model, settings, shell, and privileged controls are terminal-only.`;
 }
 
+export function formatTelegramMessageReceipt(active: boolean): string {
+  return active
+    ? 'Received. I will respond here and keep the current work running.'
+    : 'Received. I will respond here when the terminal session has processed this message.';
+}
+
+export function formatTelegramMessageFailure(reason: 'empty' | 'no-model' | 'rejected' | 'failed'): string {
+  switch (reason) {
+    case 'empty':
+      return 'No text was received, so nothing was queued.';
+    case 'no-model':
+      return 'I received your message, but no model is selected. Select one with /models in the terminal, then resend it.';
+    case 'rejected':
+      return 'The terminal rejected this message before it started, so no work was queued.';
+    case 'failed':
+      return 'The message could not be started safely. No automatic retry was attempted.';
+  }
+}
+
 export function formatThreadNotice(title: string | undefined, id: string): string {
   return `Now following thread: ${formatThreadReference(title, id)}`;
 }

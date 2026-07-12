@@ -80,6 +80,22 @@ describe('GoalManager adapter', () => {
     expect(manager.isActive()).toBe(true);
   });
 
+  it('persists unbounded managed-workflow objectives without changing the default turn display', async () => {
+    const agent = createAgent();
+    const state = createState(agent);
+    const manager = new GoalManager();
+
+    const goal = await manager.setGoal(state, 'mastra workflow --run', '__GATEWAY_OPENAI_MODEL__', 50, {
+      unbounded: true,
+    });
+
+    expect(agent.setObjective).toHaveBeenCalledWith(
+      'mastra workflow --run',
+      expect.objectContaining({ maxRuns: 50, unbounded: true }),
+    );
+    expect(goal).toMatchObject({ maxTurns: 50, unbounded: true });
+  });
+
   it('falls back to a local record when no agent or thread is available', async () => {
     const state = createState(undefined, undefined);
     const manager = new GoalManager();

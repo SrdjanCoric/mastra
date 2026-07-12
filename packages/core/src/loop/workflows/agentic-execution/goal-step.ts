@@ -2,6 +2,7 @@ import { generateId } from '@internal/ai-sdk-v5';
 import type { ToolSet } from '@internal/ai-sdk-v5';
 import {
   createGoalScorer,
+  getLatestUserContext,
   GOAL_SCORE_WAITING,
   GOAL_SCORER_ID,
   readObjective,
@@ -143,7 +144,7 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
       // re-enters already at/over budget (e.g. maxRuns was lowered below the
       // current runsUsed): never burn another judge call or push runsUsed past
       // the budget — stop the loop and emit a terminal goal chunk without scoring.
-      if (record.runsUsed >= effective.maxRuns) {
+      if (!effective.unbounded && record.runsUsed >= effective.maxRuns) {
         if (inputData.stepResult) {
           inputData.stepResult.isContinued = false;
         }
@@ -155,6 +156,7 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
             objective: record.objective,
             iteration: record.runsUsed,
             maxRuns: effective.maxRuns,
+            unbounded: effective.unbounded,
             passed: false,
             status: record.status,
             results: [],
@@ -197,6 +199,11 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
       // Catch any failure and convert it into the same errored scorer result the
       // in-`scorer.run` path produces, so the single judge-failure → paused path
       // below handles it uniformly regardless of where the failure originated.
+      const messages = messageList.get.all.db();
+      const { lastUserDelivery, assistantStepsSinceLastUser } = getLatestUserContext({ input: { messages } });
+      const answeringActiveInterjection = lastUserDelivery === 'while-active' && assistantStepsSinceLastUser <= 1;
+      const evaluation = record.runsUsed + (answeringActiveInterjection ? 0 : 1);
+
       let result: Awaited<ReturnType<typeof runStreamCompletionScorers>>;
       try {
         const emitJudgeActivity = (activity: GoalEvaluationActivity, args?: unknown) => {
@@ -316,12 +323,12 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
         const toolCalls = (inputData.output.toolCalls || []) as Array<{ toolName: string; args?: unknown }>;
         const toolResults = (inputData.output.toolResults || []) as Array<{ toolName: string; result?: unknown }>;
         const goalContext: StreamCompletionContext = {
-          iteration: record.runsUsed + 1,
+          iteration: evaluation,
           maxIterations: effective.maxRuns,
           originalTask: record.objective,
           currentText: inputData.output.text || '',
           toolCalls: toolCalls.map(tc => ({ name: tc.toolName, args: (tc.args || {}) as Record<string, unknown> })),
-          messages: messageList.get.all.db(),
+          messages,
           toolResults: toolResults.map(tr => ({ name: tr.toolName, result: tr.result as Record<string, unknown> })),
           agentId: agentId || '',
           agentName: agentName || '',
@@ -339,8 +346,9 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
           from: ChunkFrom.AGENT,
           payload: {
             objective: record.objective,
-            iteration: record.runsUsed + 1,
+            iteration: evaluation,
             maxRuns: effective.maxRuns,
+            unbounded: effective.unbounded,
             passed: false,
             status: record.status,
             results: [],
@@ -403,13 +411,11 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
         !result.complete &&
         result.scorers.some(s => s.scorerId === GOAL_SCORER_ID && s.score === GOAL_SCORE_WAITING);
 
-      // Increment runs and update status. Precedence: judge failure → paused;
-      // complete → done; budget exhausted → paused. A "waiting" decision does
-      // NOT change the persisted status — the record stays `active` so the next
-      // agent turn is still judged; only `isContinued` is set to false (below)
-      // to stop the auto-loop and give the user a chance to provide input.
-      const runsUsed = record.runsUsed + 1;
-      const maxRunsReached = runsUsed >= effective.maxRuns;
+      // Increment runs and update status. A while-active user interjection is
+      // answered inside the current goal but does not consume autonomous-work
+      // budget. Unbounded goals never stop on a run count.
+      const runsUsed = evaluation;
+      const maxRunsReached = !effective.unbounded && runsUsed >= effective.maxRuns;
       let status: GoalObjectiveRecord['status'] = record.status;
       let pausedReason: string | undefined;
       if (judgeFailed) {
@@ -449,6 +455,7 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
         objective: record.objective,
         iteration: runsUsed,
         maxRuns: effective.maxRuns,
+        unbounded: effective.unbounded,
         passed: result.complete,
         status,
         pausedReason,
@@ -481,9 +488,10 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
         },
       });
       const feedback = result.completionReason ?? 'The goal is not yet complete.';
+      const runStatus = effective.unbounded ? `${runsUsed} runs` : `${runsUsed}/${effective.maxRuns}`;
       const continuation = shouldContinue
-        ? `[Goal attempt ${runsUsed}/${effective.maxRuns}] The goal is not yet complete. Judge feedback: ${feedback}\n\nContinue working toward the goal: ${record.objective}`
-        : `${status} (${runsUsed}/${effective.maxRuns})\n${goalEvaluationPayload.reason ?? ''}`;
+        ? `[Goal ${runStatus}] The goal is not yet complete. Judge feedback: ${feedback}\n\nContinue working toward the goal: ${record.objective}`
+        : `${status} (${runStatus})\n${goalEvaluationPayload.reason ?? ''}`;
       await sendSignal({
         type: 'system-reminder',
         contents: continuation,
