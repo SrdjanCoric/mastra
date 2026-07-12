@@ -33,7 +33,7 @@ export {
   type ResolvedGoalStore,
 } from './objective';
 
-export { createGoalScorer } from './scorer';
+export { createGoalScorer, getLatestUserContext } from './scorer';
 
 export { GoalStateProcessor } from './state-processor';
 

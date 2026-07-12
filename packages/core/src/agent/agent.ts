@@ -903,6 +903,7 @@ export class Agent<
       resourceId?: string;
       judgeModelId?: string;
       maxRuns?: number;
+      unbounded?: boolean;
       prompt?: string;
       id?: string;
     },
@@ -919,6 +920,7 @@ export class Agent<
       startedAt: now,
       updatedAt: now,
       ...(options.maxRuns !== undefined && options.maxRuns > 0 ? { maxRuns: options.maxRuns } : {}),
+      ...(options.unbounded === true ? { unbounded: true } : {}),
       ...(options.judgeModelId !== undefined ? { judgeModelId: options.judgeModelId } : {}),
       ...(options.prompt !== undefined ? { prompt: options.prompt } : {}),
     };
@@ -952,6 +954,7 @@ export class Agent<
     threadId: string;
     judgeModelId?: string;
     maxRuns?: number;
+    unbounded?: boolean;
     prompt?: string;
     status?: GoalObjectiveRecord['status'];
   }): Promise<GoalObjectiveRecord | undefined> {
@@ -964,6 +967,7 @@ export class Agent<
       updatedAt: Date.now(),
       ...(options.judgeModelId !== undefined ? { judgeModelId: options.judgeModelId } : {}),
       ...(options.maxRuns !== undefined && options.maxRuns > 0 ? { maxRuns: options.maxRuns } : {}),
+      ...(options.unbounded !== undefined ? { unbounded: options.unbounded } : {}),
       ...(options.prompt !== undefined ? { prompt: options.prompt } : {}),
       ...(options.status !== undefined ? { status: options.status } : {}),
     };

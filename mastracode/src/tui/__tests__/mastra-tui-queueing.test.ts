@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   showInfo: vi.fn(),
   showError: vi.fn(),
   startGoalWithDefaults: vi.fn(),
+  startManagedWorkflowGoal: vi.fn(),
 }));
 
 vi.mock('../render-messages.js', async importOriginal => {
@@ -29,6 +30,7 @@ vi.mock('../commands/goal.js', async importOriginal => {
   return {
     ...actual,
     startGoalWithDefaults: mocks.startGoalWithDefaults,
+    startManagedWorkflowGoal: mocks.startManagedWorkflowGoal,
   };
 });
 
@@ -142,19 +144,23 @@ describe('MastraTUI queueing', () => {
     mocks.showInfo.mockReset();
     mocks.showError.mockReset();
     mocks.startGoalWithDefaults.mockReset().mockResolvedValue(undefined);
+    mocks.startManagedWorkflowGoal.mockReset().mockResolvedValue(true);
   });
 
   it('starts the documented managed workflow prompt as a persistent goal', async () => {
     const state = createQueueState({
       session: {
         run: { isRunning: vi.fn(() => false) },
-        model: { hasSelection: vi.fn(() => true) },
+        model: { hasSelection: vi.fn(() => true), get: vi.fn(() => 'openai/gpt-5.2') },
       } as unknown as TUIState['session'],
     });
     const commandContext = { state };
     const tui = Object.create(MastraTUI.prototype) as {
       state: TUIState;
-      startManagedWorkflowGoalIfRequested: (content: string, options?: { label?: string }) => Promise<boolean>;
+      startManagedWorkflowGoalIfRequested: (
+        content: string,
+        options?: { label?: string; onRejected?: () => void },
+      ) => Promise<boolean>;
       runUserPromptHook: (content: string) => Promise<boolean>;
       buildCommandContext: () => typeof commandContext;
     };
@@ -170,15 +176,51 @@ describe('MastraTUI queueing', () => {
       expect.objectContaining({ role: 'user', content: [{ type: 'text', text: 'mastra workflow --run' }] }),
       { label: 'Telegram' },
     );
-    expect(mocks.startGoalWithDefaults).toHaveBeenCalledWith(
+    expect(mocks.startManagedWorkflowGoal).toHaveBeenCalledWith(
       commandContext,
       'mastra workflow --run',
-      'Workflow cancelled.',
+      'openai/gpt-5.2',
+    );
+    expect(mocks.startGoalWithDefaults).not.toHaveBeenCalled();
+  });
+
+  it('reports a managed-workflow start failure after acknowledging its Telegram message', async () => {
+    mocks.startManagedWorkflowGoal.mockResolvedValueOnce(false);
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const state = createQueueState({
+      options: { messageBridge: { sendMessage, health: () => 'connected' } } as unknown as TUIState['options'],
+      session: {
+        run: { isRunning: vi.fn(() => false) },
+        model: { hasSelection: vi.fn(() => true), get: vi.fn(() => 'openai/gpt-5.2') },
+      } as unknown as TUIState['session'],
+    });
+    const commandContext = { state };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: TUIState;
+      receiveExternalMessage: (message: { text: string }) => Promise<void>;
+      runUserPromptHook: (content: string) => Promise<boolean>;
+      buildCommandContext: () => typeof commandContext;
+    };
+    tui.state = state;
+    tui.runUserPromptHook = vi.fn().mockResolvedValue(true);
+    tui.buildCommandContext = vi.fn(() => commandContext);
+
+    await tui.receiveExternalMessage({ text: 'mastra workflow --run' });
+
+    expect(sendMessage).toHaveBeenNthCalledWith(
+      1,
+      'Received. I will respond here when the terminal session has processed this message.',
+    );
+    expect(sendMessage).toHaveBeenNthCalledWith(
+      2,
+      'The message could not be started safely. No automatic retry was attempted.',
     );
   });
 
-  it('routes Telegram text through the native follow-up signal while a turn is running', async () => {
+  it('acknowledges Telegram text before routing it through an active run', async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
     const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected' } },
       session: {
         run: { isRunning: vi.fn(() => true) },
         model: { hasSelection: vi.fn(() => true) },
@@ -194,7 +236,12 @@ describe('MastraTUI queueing', () => {
 
     await tui.receiveExternalMessage({ text: 'continue from Telegram' });
 
-    expect(tui.signalMessage).toHaveBeenCalledWith('continue from Telegram', undefined, { label: 'Telegram' });
+    expect(sendMessage).toHaveBeenCalledWith('Received. I will respond here and keep the current work running.');
+    expect(tui.signalMessage).toHaveBeenCalledWith(
+      'continue from Telegram',
+      undefined,
+      expect.objectContaining({ label: 'Telegram', onFailure: expect.any(Function) }),
+    );
   });
 
   it('handles Telegram commands without forwarding them to the model', async () => {
@@ -359,8 +406,10 @@ describe('MastraTUI queueing', () => {
     },
   );
 
-  it('starts an idle Telegram message through one native signal without an optimistic duplicate', async () => {
+  it('acknowledges an idle Telegram message and starts one native signal without an optimistic duplicate', async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
     const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected' } },
       session: {
         run: { isRunning: vi.fn(() => false) },
         model: { hasSelection: vi.fn(() => true) },
@@ -380,10 +429,70 @@ describe('MastraTUI queueing', () => {
 
     await tui.receiveExternalMessage({ text: 'start from Telegram' });
 
+    expect(sendMessage).toHaveBeenCalledWith(
+      'Received. I will respond here when the terminal session has processed this message.',
+    );
     expect(tui.runUserPromptHook).toHaveBeenCalledWith('start from Telegram');
-    expect(tui.signalMessage).toHaveBeenCalledWith('start from Telegram', undefined, { label: 'Telegram' });
+    expect(tui.signalMessage).toHaveBeenCalledWith(
+      'start from Telegram',
+      undefined,
+      expect.objectContaining({ label: 'Telegram', onFailure: expect.any(Function) }),
+    );
     expect(tui.fireMessage).not.toHaveBeenCalled();
     expect(mocks.addUserMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['', 'No text was received, so nothing was queued.'],
+    [
+      'start without a model',
+      'I received your message, but no model is selected. Select one with /models in the terminal, then resend it.',
+    ],
+  ])('sends one deterministic Telegram failure reply for %j', async (text, reply) => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected' } },
+      session: {
+        run: { isRunning: vi.fn(() => false) },
+        model: { hasSelection: vi.fn(() => false) },
+      },
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (message: { text: string }) => Promise<void>;
+    };
+    tui.state = state;
+
+    await tui.receiveExternalMessage({ text });
+
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(reply);
+  });
+
+  it('reports a Telegram signal failure after acknowledging receipt', async () => {
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected' } },
+      session: {
+        run: { isRunning: vi.fn(() => true) },
+        model: { hasSelection: vi.fn(() => true) },
+      },
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (message: { text: string }) => Promise<void>;
+      signalMessage: (text: string, images?: undefined, options?: { label?: string; onFailure?: () => void }) => void;
+    };
+    tui.state = state;
+    tui.signalMessage = vi.fn((_text, _images, options) => options?.onFailure?.());
+
+    await tui.receiveExternalMessage({ text: 'continue from Telegram' });
+
+    expect(sendMessage).toHaveBeenNthCalledWith(1, 'Received. I will respond here and keep the current work running.');
+    expect(sendMessage).toHaveBeenNthCalledWith(
+      2,
+      'The message could not be started safely. No automatic retry was attempted.',
+    );
   });
 
   it('sends editor submissions as signals instead of resolving input while the controller is running', async () => {

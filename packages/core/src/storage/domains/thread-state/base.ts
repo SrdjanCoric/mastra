@@ -37,6 +37,8 @@ export interface GoalObjectiveRecord {
   runsUsed: number;
   /** Max evaluations before the goal stops. Falls back to agent `goal.maxRuns` (default 50). */
   maxRuns?: number;
+  /** When true, the goal has no evaluation budget and continues until done, waiting, stopped, or failed. */
+  unbounded?: boolean;
   /** Judge model id. Falls back to agent `goal.judge`; if neither resolves the goal is a no-op. */
   judgeModelId?: string;
   /** Extra judge guidance. Falls back to agent `goal.prompt` (default = built-in goal judge prompt). */

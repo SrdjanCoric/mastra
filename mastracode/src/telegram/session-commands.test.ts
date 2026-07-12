@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   formatTelegramHelp,
+  formatTelegramMessageFailure,
+  formatTelegramMessageReceipt,
   formatTelegramStatus,
   formatThreadNotice,
   parseTelegramCommand,
@@ -64,6 +66,20 @@ describe('Telegram session commands', () => {
     });
     expect(output).toContain('Project: project Injected: secret');
     expect(output.split('\n')).toHaveLength(10);
+  });
+
+  it('formats deterministic receipts for idle and active messages', () => {
+    expect(formatTelegramMessageReceipt(false)).toBe(
+      'Received. I will respond here when the terminal session has processed this message.',
+    );
+    expect(formatTelegramMessageReceipt(true)).toBe('Received. I will respond here and keep the current work running.');
+  });
+
+  it('formats bounded failure replies without echoing message content', () => {
+    expect(formatTelegramMessageFailure('empty')).toBe('No text was received, so nothing was queued.');
+    expect(formatTelegramMessageFailure('no-model')).toContain('no model is selected');
+    expect(formatTelegramMessageFailure('rejected')).toContain('no work was queued');
+    expect(formatTelegramMessageFailure('failed')).toContain('No automatic retry');
   });
 
   it('lists only supported commands and terminal-only controls', () => {

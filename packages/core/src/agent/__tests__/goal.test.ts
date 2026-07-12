@@ -52,12 +52,13 @@ describe('resolveEffectiveGoalSettings', () => {
     expect(resolveEffectiveGoalSettings(undefined, undefined)).toEqual({
       judgeModelId: undefined,
       maxRuns: DEFAULT_GOAL_MAX_RUNS,
+      unbounded: false,
       prompt: DEFAULT_GOAL_JUDGE_PROMPT,
     });
 
     expect(
       resolveEffectiveGoalSettings(undefined, { judgeModelId: 'agent-judge', maxRuns: 10, prompt: 'agent-prompt' }),
-    ).toEqual({ judgeModelId: 'agent-judge', maxRuns: 10, prompt: 'agent-prompt' });
+    ).toEqual({ judgeModelId: 'agent-judge', maxRuns: 10, unbounded: false, prompt: 'agent-prompt' });
   });
 
   it('lets the ThreadState record override agent config', () => {
@@ -74,6 +75,7 @@ describe('resolveEffectiveGoalSettings', () => {
     expect(resolveEffectiveGoalSettings(record, { judgeModelId: 'agent-judge', maxRuns: 99 })).toEqual({
       judgeModelId: 'record-judge',
       maxRuns: 3,
+      unbounded: false,
       prompt: 'record-prompt',
     });
   });
@@ -83,6 +85,7 @@ describe('resolveEffectiveGoalSettings', () => {
     expect(resolveEffectiveGoalSettings(record, { judgeModelId: 'agent-judge', maxRuns: 7 })).toEqual({
       judgeModelId: 'agent-judge',
       maxRuns: 7,
+      unbounded: false,
       prompt: DEFAULT_GOAL_JUDGE_PROMPT,
     });
   });

@@ -73,6 +73,7 @@ Your "reason" field is sent back to the assistant as guidance when the goal is n
 export interface EffectiveGoalSettings {
   judgeModelId: string | undefined;
   maxRuns: number;
+  unbounded: boolean;
   prompt: string;
   maxSteps: number | undefined;
 }
@@ -97,6 +98,7 @@ export function resolveEffectiveGoalSettings(
   return {
     judgeModelId: record?.judgeModelId ?? agentDefaults?.judgeModelId,
     maxRuns: record?.maxRuns ?? agentDefaults?.maxRuns ?? DEFAULT_GOAL_MAX_RUNS,
+    unbounded: record?.unbounded === true,
     prompt: record?.prompt ?? agentDefaults?.prompt ?? DEFAULT_GOAL_JUDGE_PROMPT,
     maxSteps: agentDefaults?.maxSteps,
   };

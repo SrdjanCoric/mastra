@@ -65,7 +65,7 @@ function extractTextContent(content: unknown): string {
   return '';
 }
 
-function getLatestUserContext(run: { input?: unknown }): {
+export function getLatestUserContext(run: { input?: unknown }): {
   lastUserContent: string | null;
   lastUserDelivery: string | null;
   assistantStepsSinceLastUser: number;

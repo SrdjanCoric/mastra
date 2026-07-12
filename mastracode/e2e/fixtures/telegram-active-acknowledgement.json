@@ -1,0 +1,38 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "userMessage": "Run the active Telegram acknowledgement check.",
+        "model": "gpt-5.4-mini",
+        "endpoint": "chat",
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "id": "call_active_telegram_acknowledgement",
+            "name": "execute_command",
+            "arguments": {
+              "command": "node -e \"let i=0;const timer=setInterval(()=>{console.log('ACTIVE_TELEGRAM_'+i);i+=1;if(i===8)clearInterval(timer)},100)\"",
+              "timeout": 5,
+              "cwd": null,
+              "tail": 20,
+              "background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "userMessage": "What is the active work status?",
+        "model": "gpt-5.4-mini",
+        "endpoint": "chat",
+        "hasToolResult": true
+      },
+      "response": {
+        "content": "Active Telegram message answered; normal work continued."
+      }
+    }
+  ]
+}

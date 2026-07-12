@@ -191,7 +191,7 @@ describe('goal step waiting semantics', () => {
 
       const [prompt, options] = (streamSpy.mock.calls[0] ?? []) as any[];
       expect(prompt).toBe(
-        'Goal: implement X, then stop and wait for my review\n\nLatest user message:\nPlease continue after answering this.\n\nAssistant steps since that user message: 1\n\nLatest assistant message:\nI did X',
+        'Goal: implement X, then stop and wait for my review\n\nLatest user message:\nPlease continue after answering this.\n\nLatest user delivery: unspecified\n\nAssistant steps since that user message: 1\n\nLatest assistant message:\nI did X',
       );
       expect(options?.memory?.thread).toEqual({
         id: 'thread-1-goal-1',
@@ -281,6 +281,57 @@ describe('goal step waiting semantics', () => {
     expect(chunk.payload.status).toBe('active');
   });
 
+  it('does not consume a run when answering a while-active interjection', async () => {
+    const { record, stepResult, chunk } = await runGoalStep('continue', makeRecord({ runsUsed: 4, maxRuns: 5 }), {
+      dbMessages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'What is the current status?' }],
+          attributes: { delivery: 'while-active' },
+        },
+        { role: 'assistant', content: [{ type: 'text', text: 'The workflow is still running.' }] },
+      ],
+    });
+
+    expect(record.runsUsed).toBe(4);
+    expect(record.status).toBe('active');
+    expect(stepResult.isContinued).toBe(true);
+    expect(chunk.payload.iteration).toBe(4);
+    expect(chunk.payload.maxRunsReached).toBe(false);
+  });
+
+  it('resumes consuming runs after the while-active interjection response', async () => {
+    const { record, stepResult } = await runGoalStep('continue', makeRecord({ runsUsed: 4, maxRuns: 6 }), {
+      dbMessages: [
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'What is the current status?' }],
+          attributes: { delivery: 'while-active' },
+        },
+        { role: 'assistant', content: [{ type: 'text', text: 'The workflow is still running.' }] },
+        { role: 'assistant', content: [{ type: 'text', text: 'Continuing the planned implementation.' }] },
+      ],
+    });
+
+    expect(record.runsUsed).toBe(5);
+    expect(record.status).toBe('active');
+    expect(stepResult.isContinued).toBe(true);
+  });
+
+  it('continues an unbounded goal after the configured max-runs value', async () => {
+    const { record, stepResult, chunk, messages } = await runGoalStep(
+      'continue',
+      makeRecord({ runsUsed: 50, maxRuns: 50, unbounded: true }),
+    );
+
+    expect(record.runsUsed).toBe(51);
+    expect(record.status).toBe('active');
+    expect(stepResult.isContinued).toBe(true);
+    expect(chunk.payload.unbounded).toBe(true);
+    expect(chunk.payload.maxRunsReached).toBe(false);
+    expect(messages[0].content.parts[0].text).toContain('[Goal 51 runs]');
+  });
+
   it('persists waiting feedback as a goal-judge signal, not assistant-authored transcript text', async () => {
     const { messages, chunk } = await runGoalStep('waiting', makeRecord());
 
@@ -321,7 +372,7 @@ describe('goal step waiting semantics', () => {
       reason: 'r:continue',
     });
     expect(messages[0].content.parts[0].text).toBe(
-      '[Goal attempt 2/10] The goal is not yet complete. Judge feedback: r:continue\n\nContinue working toward the goal: implement X, then stop and wait for my review',
+      '[Goal 2/10] The goal is not yet complete. Judge feedback: r:continue\n\nContinue working toward the goal: implement X, then stop and wait for my review',
     );
     expect(inputData.messageId).toBe('response-2');
     expect(dataParts).toHaveLength(1);

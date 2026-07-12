@@ -27,6 +27,8 @@ import {
 import type { LoadedPlugin } from '../plugins/types.js';
 import {
   formatTelegramHelp,
+  formatTelegramMessageFailure,
+  formatTelegramMessageReceipt,
   formatTelegramStatus,
   formatThreadNotice,
   formatThreadReference,
@@ -43,7 +45,7 @@ import {
 } from '../utils/update-check.js';
 import { insertChatComponentWithBoundarySpacing } from './chat-boundary-reconciliation.js';
 import { dispatchSlashCommand } from './command-dispatch.js';
-import { startGoalWithDefaults } from './commands/goal.js';
+import { startGoalWithDefaults, startManagedWorkflowGoal } from './commands/goal.js';
 
 import type { SlashCommandContext } from './commands/types.js';
 import { AskQuestionInlineComponent } from './components/ask-question-inline.js';
@@ -498,12 +500,16 @@ export class MastraTUI {
     });
   }
 
-  private async startManagedWorkflowGoalIfRequested(content: string, options?: { label?: string }): Promise<boolean> {
+  private async startManagedWorkflowGoalIfRequested(
+    content: string,
+    options?: { label?: string; onRejected?: () => void },
+  ): Promise<boolean> {
     const objective = parseManagedWorkflowGoal(content);
     if (!objective || this.state.session.run.isRunning()) return false;
 
     if (!this.state.session.model.hasSelection()) {
       showInfo(this.state, 'No model selected. Use /models to select a model, or /login to authenticate.');
+      options?.onRejected?.();
       return true;
     }
 
@@ -514,17 +520,27 @@ export class MastraTUI {
     const allowed = await this.runUserPromptHook(content);
     if (!allowed) {
       this.removeOptimisticUserMessage(messageId);
+      options?.onRejected?.();
       return true;
     }
 
-    await startGoalWithDefaults(this.buildCommandContext(), objective, 'Workflow cancelled.');
+    try {
+      const started = await startManagedWorkflowGoal(
+        this.buildCommandContext(),
+        objective,
+        this.state.session.model.get()!,
+      );
+      if (!started) options?.onRejected?.();
+    } catch {
+      options?.onRejected?.();
+    }
     return true;
   }
 
   private signalMessage(
     content: string,
     images?: Array<{ data: string; mimeType: string }>,
-    options?: { label?: string },
+    options?: { label?: string; onFailure?: () => void },
   ): void {
     const hasActiveRun = this.state.session.stream.isActive();
 
@@ -546,7 +562,7 @@ export class MastraTUI {
         });
       } else {
         const message = this.createUserSignalMessage(content, images, signal.id);
-        if (options) addUserMessage(this.state, message, options);
+        if (options?.label) addUserMessage(this.state, message, { label: options.label });
         else addUserMessage(this.state, message);
       }
 
@@ -557,6 +573,7 @@ export class MastraTUI {
           this.removeOptimisticUserMessage(signal.id);
         }
         showError(this.state, error instanceof Error ? error.message : 'Unknown error');
+        options?.onFailure?.();
       });
     };
 
@@ -568,6 +585,7 @@ export class MastraTUI {
 
     pendingThread.then(send).catch((error: unknown) => {
       showError(this.state, error instanceof Error ? error.message : 'Unknown error');
+      options?.onFailure?.();
     });
   }
 
@@ -657,23 +675,37 @@ export class MastraTUI {
     }
 
     const content = input.text;
-    if (!content) return;
+    if (!content) {
+      await this.sendTelegramControlMessage(formatTelegramMessageFailure('empty'));
+      return;
+    }
 
-    if (this.state.session.run.isRunning()) {
-      this.signalMessage(content, undefined, { label: 'Telegram' });
-      return;
-    }
-    if (await this.startManagedWorkflowGoalIfRequested(content, { label: 'Telegram' })) {
-      return;
-    }
-    if (!this.state.session.model.hasSelection()) {
+    const isRunning = this.state.session.run.isRunning();
+    if (!isRunning && !this.state.session.model.hasSelection()) {
       showInfo(this.state, 'Telegram message received, but no model is selected. Use /models in the terminal.');
+      await this.sendTelegramControlMessage(formatTelegramMessageFailure('no-model'));
+      return;
+    }
+
+    await this.sendTelegramControlMessage(formatTelegramMessageReceipt(isRunning));
+    const onFailure = () => {
+      void this.sendTelegramControlMessage(formatTelegramMessageFailure('failed'));
+    };
+
+    if (isRunning) {
+      this.signalMessage(content, undefined, { label: 'Telegram', onFailure });
+      return;
+    }
+    if (await this.startManagedWorkflowGoalIfRequested(content, { label: 'Telegram', onRejected: onFailure })) {
       return;
     }
 
     const allowed = await this.runUserPromptHook(content);
-    if (!allowed) return;
-    this.signalMessage(content, undefined, { label: 'Telegram' });
+    if (!allowed) {
+      await this.sendTelegramControlMessage(formatTelegramMessageFailure('rejected'));
+      return;
+    }
+    this.signalMessage(content, undefined, { label: 'Telegram', onFailure });
   }
 
   private queueFollowUpMessage(text: string): void {

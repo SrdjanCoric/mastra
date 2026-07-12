@@ -27,6 +27,7 @@ import type { SlashCommandContext } from './types.js';
 
 export interface StartGoalOptions {
   trigger?: 'send' | 'none';
+  unbounded?: boolean;
 }
 
 export async function handleGoalCommand(ctx: SlashCommandContext, args: string[]): Promise<void> {
@@ -54,9 +55,8 @@ export async function handleGoalCommand(ctx: SlashCommandContext, args: string[]
     }
     await goalManager.saveToThread(state);
     ctx.updateStatusLine();
-    ctx.showInfo(
-      `Goal paused: "${goal.objective}" (${goal.turnsUsed}/${goal.maxTurns} turns used). Use /goal resume to continue.`,
-    );
+    const runs = goal.unbounded ? `${goal.turnsUsed} runs, unlimited` : `${goal.turnsUsed}/${goal.maxTurns} turns used`;
+    ctx.showInfo(`Goal paused: "${goal.objective}" (${runs}). Use /goal resume to continue.`);
     return;
   }
 
@@ -131,7 +131,8 @@ export async function handleGoalCommand(ctx: SlashCommandContext, args: string[]
 }
 
 function formatGoalStatus(goal: GoalState): string {
-  return `Goal (${goal.status}): "${goal.objective}" — ${goal.turnsUsed}/${goal.maxTurns} turns used [judge: ${goal.judgeModelId}]`;
+  const runs = goal.unbounded ? `${goal.turnsUsed} runs, unlimited` : `${goal.turnsUsed}/${goal.maxTurns} turns used`;
+  return `Goal (${goal.status}): "${goal.objective}" — ${runs} [judge: ${goal.judgeModelId}]`;
 }
 
 function formatGoalStatusRow(goal: GoalState): string {
@@ -243,6 +244,14 @@ export async function startGoalWithDefaults(
   await startGoal(ctx, objective, judgeDefaults.judgeModelId, judgeDefaults.maxTurns, options);
 }
 
+export async function startManagedWorkflowGoal(
+  ctx: SlashCommandContext,
+  objective: string,
+  judgeModelId: string,
+): Promise<boolean> {
+  return startGoal(ctx, objective, judgeModelId, DEFAULT_MAX_TURNS, { unbounded: true });
+}
+
 function getJudgeDefaults(): JudgeDefaults | null {
   const settings = loadSettings();
   const judgeModelId = settings.models.goalJudgeModel;
@@ -323,7 +332,7 @@ async function startGoal(
   judgeModelId: string,
   maxTurns: number,
   options: StartGoalOptions = {},
-): Promise<void> {
+): Promise<boolean> {
   const { state } = ctx;
   const goalManager = state.goalManager;
 
@@ -333,10 +342,12 @@ async function startGoal(
   }
 
   const shouldPersistToCreatedThread = !state.session.thread.getId();
-  const goal = await goalManager.setGoal(state, objective, judgeModelId, maxTurns);
+  const goal = options.unbounded
+    ? await goalManager.setGoal(state, objective, judgeModelId, maxTurns, { unbounded: true })
+    : await goalManager.setGoal(state, objective, judgeModelId, maxTurns);
   if (!goal) {
     ctx.showError('Failed to set goal.');
-    return;
+    return false;
   }
 
   state.planStartedGoalId = undefined;
@@ -352,15 +363,17 @@ async function startGoal(
   ctx.updateStatusLine();
 
   if (options.trigger === 'none') {
-    return;
+    return true;
   }
 
   try {
     await state.session.sendSignal(createGoalReminderSignal(goal)).accepted;
+    return true;
   } catch (err) {
     goalManager.pause();
     await goalManager.saveToThread(state);
     ctx.showError(`Goal paused — failed to start: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
   }
 }
 
@@ -372,6 +385,7 @@ function createGoalReminderSignal(goal: GoalState) {
     metadata: {
       goalId: goal.id,
       maxTurns: goal.maxTurns,
+      unbounded: goal.unbounded,
       judgeModelId: goal.judgeModelId,
     },
   };
