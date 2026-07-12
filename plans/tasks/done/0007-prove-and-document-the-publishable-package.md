@@ -43,3 +43,4 @@ Completed on 2026-07-12.
 - Package proof: `pnpm --filter ./mastracode run verify:publication-package` passed for `mastracode-remote-0.1.3.tgz`.
 - Full package proof: `pnpm test:mastracode` passed 2,086 tests in 205 files. `pnpm --filter ./mastracode check`, `pnpm --filter ./mastracode lint`, and `pnpm build:mastracode` also passed; the build completed 50 tasks.
 - Manual proof: the user confirmed the documented live Telegram checklist passed with the real bot, private forum group, and visible TUI. No credentials, Telegram identifiers, or message content were recorded.
+- Merged in PR #11 with merge commit `1618e6b305704b16e536c9b6a2b9a1e19b71a4e9`.
