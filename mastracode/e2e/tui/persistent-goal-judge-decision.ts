@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { expect } from './expect.js';
 import type { McE2eScenario } from './types.js';
 
-const OBJECTIVE = 'Complete two autonomous workflow tasks without stopping after a status interjection.';
+const OBJECTIVE = 'mastra workflow --run';
 const STATUS_MESSAGE = 'What is the current workflow status?';
 
 export const persistentGoalJudgeDecisionScenario: McE2eScenario = {
   name: 'persistent-goal-judge-decision',
-  description: 'Keep an active goal running after a while-active status interjection and complete the next task.',
-  testName: 'continues an active workflow after answering a status interjection',
+  description: 'Start the documented managed workflow prompt as a goal and continue after a status interjection.',
+  testName: 'continues a managed workflow after answering a status interjection',
   useOpenAIModel: true,
   aimockFixture: 'persistent-goal-judge-decision.json',
   prepare({ appDataDir }) {
@@ -29,7 +29,7 @@ export const persistentGoalJudgeDecisionScenario: McE2eScenario = {
     runtime.startLiveOutput(terminal);
     await (expect(terminal.getByText(/Project:|Resource ID:|>/gi, { full: true, strict: false })) as any).toBeVisible();
 
-    terminal.submit(`/goal ${OBJECTIVE}`);
+    terminal.submit(OBJECTIVE);
     await runtime.waitForScreenText(/pursuing goal/i, terminal, 8_000);
     terminal.submit(STATUS_MESSAGE);
 

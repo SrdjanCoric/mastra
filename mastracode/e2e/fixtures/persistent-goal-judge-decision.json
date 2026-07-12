@@ -24,7 +24,7 @@
       "match": {
         "endpoint": "chat",
         "model": "gpt-5.4-mini",
-        "userMessage": "Complete two autonomous workflow tasks without stopping after a status interjection.",
+        "userMessage": "mastra workflow --run",
         "sequenceIndex": 0
       },
       "response": {
@@ -35,7 +35,7 @@
       "match": {
         "endpoint": "chat",
         "model": "gpt-5.4-mini",
-        "userMessage": "Complete two autonomous workflow tasks without stopping after a status interjection.",
+        "userMessage": "mastra workflow --run",
         "sequenceIndex": 1
       },
       "response": {

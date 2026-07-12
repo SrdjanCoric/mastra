@@ -76,7 +76,7 @@ Use the terminal TUI normally. Messages sent in the project topic enter the same
 mastra workflow
 ```
 
-The workflow settles the design with you, writes a task plan, and works through implementation, review, pull request merge, and local sync.
+MastraCode starts the workflow as a persistent goal. It settles the design with you, writes a task plan, and works through implementation, review, pull request merge, and local sync. If you send a Telegram message during the run, MastraCode answers it and continues the workflow.
 
 If a task plan already exists, tell it:
 
