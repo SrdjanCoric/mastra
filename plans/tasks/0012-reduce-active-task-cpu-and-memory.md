@@ -79,7 +79,7 @@ Loaded the implementation guidance for style and strict typing, deterministic te
 - `pnpm build:mastracode` passed: 50 tasks.
 - `pnpm performance:mastracode` passed with 20,000 chunks, 2 visible rebuilds, 2 scheduled rebuilds, 150.6 ms elapsed, 61,000 retained characters, 1,000 retained lines, 530,056 active heap bytes, and no retained preview after cleanup.
 - The checked-in `shell-output-batching` TUI scenario passed and showed intermediate output before completion, the final response, and acceptance of the next input.
-- A current-branch PTY launch sampled about 368 MB RSS during startup and settled near 286 MB RSS with 0% CPU. The small Telegram broker stayed separate. An older runaway process from before the display fixes remained above 2.6 GB RSS with about 98% CPU, matching the original failure mode. The deterministic stream and TUI scenario provide the repeatable active-output proof.
+- A current-branch PTY launch sampled about 368 MB RSS during startup and settled near 286 MB RSS with 0% CPU. A separate live `test-app` run processed 5,000 stdout and 5,000 stderr messages in 16.88 seconds, preserved ordering, produced 167,780 bytes of output, and returned to 0% CPU at about 241 MB RSS after completion. The small Telegram broker stayed separate. Older installed processes from before this branch remained above 2.2 GB RSS with sustained CPU, matching the original failure mode. The deterministic stream and TUI scenario provide the repeatable active-output proof.
 
 ### End-to-end proof
 
