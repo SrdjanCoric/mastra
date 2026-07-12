@@ -1,6 +1,6 @@
 ---
 name: mastra-talk-it-through
-description: Interview the user deeply about a plan, design, or app idea before planning. Inspect the repo when possible, build a complete app model, map workflows and edge cases, ask one question at a time with a recommendation, and stop only when enough shared understanding exists for safe autonomous planning.
+description: Interview the user deeply about a plan, design, or app idea before planning. Inspect the repo, selectively invoke the Software Repository Guidelines, build a complete app model, map workflows and edge cases, ask one question at a time with a recommendation, and stop only when enough shared understanding exists for safe autonomous planning.
 ---
 
 # Mastra Talk It Through
@@ -64,6 +64,11 @@ Build and maintain an app model in your own working notes during the interview. 
 11. **UX/communication contract** — command/API entry points, screens/prompts/messages, default vs verbose output, confirmations, acknowledgements, status wording, error wording, remote notifications, and non-TTY behavior.
 12. **Safety and abuse cases** — destructive actions, security-sensitive actions, permission boundaries, prompt-injection/input trust, secret handling, concurrent usage, repeated commands, and user-changing-their-mind cases.
 13. **Acceptance/proof model** — automated tests, smoke tests, manual verification, package/release checks, and user-visible success criteria.
+14. **Software Repository Guidelines scope** — references loaded, currently relevant items, existing gaps, requirements for this work, and items that become relevant only in later tasks.
+
+Invoke `mastra-software-repository-guidelines` in scope mode while building the app model. Do not rely
+on the caller or a previous session having invoked it. Load only the references selected for the
+project and feature surface; do not load the complete guideline set during an ordinary interview.
 
 If the project already exists, inspect docs/code/tests/config before or during the app model. Reconcile the desired behavior with what the code already does. Call out mismatches explicitly.
 
@@ -168,6 +173,13 @@ Define user-observable acceptance criteria, automated regression tests for risky
 
 Acceptance criteria must map to the scenario inventory. If a scenario matters to the user, it needs proof.
 
+### 12. Software Repository Guidelines
+
+Use the scope result from `mastra-software-repository-guidelines` to decide which repository concerns
+must influence the product plan now and which can be assigned to later work. Discuss only genuine
+applicability, architecture, scope, or behavior decisions. Do not ask the user to confirm unconditional
+checklist wording, and do not treat every future guideline as a v1 blocker.
+
 ## Question strategy
 
 Run the interview in passes. Do not try to ask a giant multi-part question.
@@ -203,6 +215,7 @@ Before returning to `mastra-workflow`, produce a **Planner Brief** with these he
 - Safety/security/destructive-action rules
 - Human checkpoints
 - Acceptance/proof requirements, including regression proof for existing apps
+- Software Repository Guidelines: references loaded, existing gaps, requirements for this work, and later-applicable items
 - Open questions deferred from v1
 
 `mastra-to-plan` must be able to plan from this brief without asking broad product-discovery questions. If the brief still contains unresolved product behavior that affects task design, keep interviewing instead of returning.
@@ -222,6 +235,7 @@ Do not return until all are true:
 - Every unresolved point is tagged as a human checkpoint or deferred non-goal.
 - You can explain the first end-to-end success path, main failure paths, highest-risk edge cases, and state changes.
 - Acceptance criteria map back to scenarios and include proof.
+- `mastra-software-repository-guidelines` was invoked in scope mode, and the Planner Brief records the references loaded and their disposition.
 - The user has confirmed the Planner Brief or corrected it.
 
 When complete, return the Planner Brief. Keep it concise enough to read, but detailed enough that planning can begin without rediscovering the app.

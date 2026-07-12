@@ -46,6 +46,12 @@ RIGHT (vertical):
 
 When exploring the codebase, use the project's domain glossary so that test names and interface vocabulary match the project's language, and respect ADRs in the area you're touching.
 
+If the caller supplied a Software Repository Guidelines result containing
+`references/02-testing.md`, reuse it. Otherwise invoke `mastra-software-repository-guidelines` and
+load that reference. Load another bundled reference only when the TDD work crosses that surface. Use
+the result as repository-level testing requirements; this skill still owns the red-green-refactor
+method.
+
 Before writing any code:
 
 - [ ] Confirm with user what interface changes are needed

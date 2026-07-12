@@ -75,10 +75,8 @@ describe('Telegram session commands', () => {
     expect(help).not.toContain('/models');
   });
 
-  it('uses a safe title or short thread identifier in notices', () => {
-    expect(formatThreadNotice('Following thread', 'A useful title', '1234567890')).toBe(
-      'Following thread: A useful title (12345678)',
-    );
-    expect(formatThreadNotice('Now following thread', undefined, '1234567890')).toBe('Now following thread: 12345678');
+  it('uses a safe title or short thread identifier in thread-change notices', () => {
+    expect(formatThreadNotice('A useful title', '1234567890')).toBe('Now following thread: A useful title (12345678)');
+    expect(formatThreadNotice(undefined, '1234567890')).toBe('Now following thread: 12345678');
   });
 });

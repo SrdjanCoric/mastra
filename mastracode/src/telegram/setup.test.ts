@@ -72,6 +72,60 @@ describe('initializeTelegramProject', () => {
     await expect(fs.access(path.join(homeDir, '.mastracode-remote'))).rejects.toThrow();
   });
 
+  it('does not mutate legacy state, launchd files, external checkouts, or unrelated topics', async () => {
+    const homeDir = await makeTemporaryDirectory();
+    const projectPath = await makeTemporaryDirectory();
+    const externalProjectPath = await makeTemporaryDirectory();
+    const canonicalExternalPath = await fs.realpath(externalProjectPath);
+    const legacySentinel = path.join(homeDir, '.mastracode-remote', 'sentinel.json');
+    const launchdSentinel = path.join(homeDir, 'Library', 'LaunchAgents', 'com.mastracode-remote.test.plist');
+    const externalSentinel = path.join(externalProjectPath, 'sentinel.txt');
+    const stateDir = path.join(homeDir, '.mastracode-telegram', 'state');
+    await fs.mkdir(path.dirname(legacySentinel), { recursive: true });
+    await fs.mkdir(path.dirname(launchdSentinel), { recursive: true });
+    await fs.mkdir(stateDir, { recursive: true });
+    await Promise.all([
+      fs.writeFile(legacySentinel, '{"legacy":true}\n', 'utf8'),
+      fs.writeFile(launchdSentinel, 'legacy-launchd-service\n', 'utf8'),
+      fs.writeFile(externalSentinel, 'external-checkout\n', 'utf8'),
+      fs.writeFile(
+        path.join(stateDir, 'projects.json'),
+        `${JSON.stringify(
+          {
+            projects: [{ projectPath: canonicalExternalPath, displayName: 'external-project', threadId: 99 }],
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      ),
+    ]);
+    const sendMessage = vi.fn().mockResolvedValue(undefined);
+    const dependencies = createDependencies({
+      createTelegramClient: vi.fn().mockReturnValue({
+        validateAuthorization: vi.fn().mockResolvedValue(undefined),
+        createForumTopic: vi.fn().mockResolvedValue({ threadId: 42 }),
+        sendMessage,
+        verifyRoundTrip: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    await initializeTelegramProject({ homeDir, projectPath, env: telegramEnv, dependencies });
+
+    expect(await fs.readFile(legacySentinel, 'utf8')).toBe('{"legacy":true}\n');
+    expect(await fs.readFile(launchdSentinel, 'utf8')).toBe('legacy-launchd-service\n');
+    expect(await fs.readFile(externalSentinel, 'utf8')).toBe('external-checkout\n');
+    const registry = JSON.parse(await fs.readFile(path.join(stateDir, 'projects.json'), 'utf8'));
+    expect(registry.projects).toEqual(
+      expect.arrayContaining([
+        { projectPath: canonicalExternalPath, displayName: 'external-project', threadId: 99 },
+        expect.objectContaining({ projectPath: await fs.realpath(projectPath), threadId: 42 }),
+      ]),
+    );
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(42, expect.any(String));
+  });
+
   it('reuses the project topic on rerun', async () => {
     const homeDir = await makeTemporaryDirectory();
     const projectPath = await makeTemporaryDirectory();

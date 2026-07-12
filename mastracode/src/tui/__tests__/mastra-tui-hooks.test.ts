@@ -58,6 +58,8 @@ function createBareTui(hookManager?: Record<string, unknown>) {
     hookManager,
     ui: { stop: vi.fn(), requestRender: vi.fn() },
     idleCounter: { setTimingState: vi.fn(), update: vi.fn() },
+    pendingTools: new Map(),
+    allToolComponents: new Set(),
   };
   tui.statusTimingTimer = null;
   tui.caffeinateProcess = null;

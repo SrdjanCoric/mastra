@@ -49,10 +49,14 @@ export const telegramSharedConversationScenario: McE2eScenario = {
 
     await deliverTelegramMessage({ text: '/help' });
     await deliverTelegramMessage({ text: '/status' });
-    expect(telegramOutput.join('\n')).toContain('Following thread:');
+    await deliverTelegramMessage({ text: '/stop' });
+    expect(telegramOutput.join('\n')).not.toContain('Following thread:');
     expect(telegramOutput.join('\n')).toContain('/status - show safe session status');
     expect(telegramOutput.join('\n')).toContain('MastraCode status');
+    expect(telegramOutput.join('\n')).toContain('Thread:');
+    expect(telegramOutput.join('\n')).toContain('Model: openai/gpt-5.4-mini');
     expect(telegramOutput.join('\n')).toContain('Telegram: connected');
+    expect(telegramOutput.join('\n')).toContain('MastraCode is already idle.');
 
     await deliverTelegramMessage({ text: 'Reply to the Telegram e2e message.' });
     await runtime.waitForScreenText(/Telegram shared conversation response/i, terminal, 30_000);

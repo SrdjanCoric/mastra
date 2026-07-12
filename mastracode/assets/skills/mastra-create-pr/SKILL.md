@@ -52,7 +52,13 @@ If there are staged changes, commit them with the project’s commit style. Neve
 
 Push the current branch and create upstream tracking if needed.
 
-### 4. Write PR prose
+### 4. Confirm review evidence
+
+Confirm the task-review result records that `mastra-software-repository-guidelines` ran, which
+references it loaded, and whether any applicable proof gap remains. If that metadata is absent or a
+blocking applicable gap remains, return to `mastra-implement-next-task`; do not open or merge the PR.
+
+### 5. Write PR prose
 
 Use `mastra-write-well` when available. Keep the PR description about the unit of work being shipped, not every detour/fix along the way.
 
@@ -64,15 +70,15 @@ Include:
 - review status,
 - any human checkpoints resolved.
 
-### 5. Open PR
+### 6. Open PR
 
 Use `gh pr create` with the generated title/body. Capture the PR URL, PR number, and branch name.
 
-### 6. Wait for checks
+### 7. Wait for checks
 
 Wait for required checks with `gh pr checks --watch` or the repo's documented equivalent. If checks fail, inspect logs, fix safe failures, push, and wait again. If credentials, branch protection, infrastructure, or policy needs a human, ask through the available Telegram/user-input channel and resume from the reply.
 
-### 7. Merge PR
+### 8. Merge PR
 
 When checks and review requirements are satisfied, merge with the repo's normal strategy using `gh pr merge`. Prefer the repository default; do not force-merge and do not bypass branch protection.
 

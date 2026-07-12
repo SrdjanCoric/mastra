@@ -284,13 +284,6 @@ export class MastraTUI {
     if (this.state.options.messageBridge) {
       try {
         await this.state.options.messageBridge.start(text => this.receiveExternalMessage(text));
-        void this.sendTelegramControlMessage(
-          formatThreadNotice(
-            'Following thread',
-            this.state.currentThreadTitle,
-            this.state.session.thread.getId() ?? '',
-          ),
-        );
       } catch (error) {
         showInfo(
           this.state,
@@ -556,7 +549,11 @@ export class MastraTUI {
     try {
       await bridge.sendMessage(text);
     } catch {
-      showInfo(this.state, 'Telegram is temporarily unavailable. The terminal session is still active.');
+      const message =
+        bridge.health() === 'connected'
+          ? 'A Telegram message could not be delivered, but the connection is still active.'
+          : 'Telegram is temporarily unavailable. The terminal session is still active.';
+      showInfo(this.state, message);
     }
   }
 
@@ -945,9 +942,7 @@ export class MastraTUI {
       } else if (event.type === 'thread_changed') {
         await this.syncThreadActivePackMetadata();
         if (this.state.options.messageBridge) {
-          void this.sendTelegramControlMessage(
-            formatThreadNotice('Now following thread', this.state.currentThreadTitle, event.threadId),
-          );
+          void this.sendTelegramControlMessage(formatThreadNotice(this.state.currentThreadTitle, event.threadId));
         }
       }
 

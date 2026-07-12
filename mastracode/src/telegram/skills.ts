@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 export const TELEGRAM_WORKFLOW_SKILLS = [
   'mastra-workflow',
+  'mastra-software-repository-guidelines',
   'mastra-talk-it-through',
   'mastra-to-plan',
   'mastra-implement-next-task',
