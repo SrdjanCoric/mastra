@@ -56,3 +56,5 @@ PR #20 is the baseline: `Validate package` took 12 minutes 39 seconds. Target a 
 - `mastracode-remote-0.2.4.tgz` passed isolated install and archive verification. The verified archive was 2,467,410 bytes with SHA-256 `14952d33ab7c92c8bc7ad984141228e64133c577e701af1c2fe0510c4b3ca861`.
 - The README already describes bounded, batched live output and the canonical package commands, so this release does not need a README change.
 - Review: Software Repository Guidelines references `00`, `02`, `05`, `06`, `07`, `08`, and `10` were checked. The review found and fixed two issues before PR: direct runtime dependency paths now trigger CI, and CodeQL alone receives `security-events: write`.
+- PR #22 passed the required checks and merged as `0fb0ceab587e10e69e04af7096b358eded4c1fd4`.
+- `mastracode-remote@0.2.4` was published from the packed tarball and confirmed on npm. The published local archive SHA-256 was `aaccdfebf50600a2c8fcc36e33908a395943fc80734470a92ffa146df206523b`.
