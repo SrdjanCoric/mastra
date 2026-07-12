@@ -1,6 +1,6 @@
 ---
 name: mastra-implement-next-task
-description: Implement the next eligible task from the master plan end-to-end on a feature branch. Run AFK by default, use Telegram checkpoints only for true human decisions/verification/DB/security confirmation, run automatic task review with two fix retries, create/merge the PR, sync main, and return for the master workflow to start the next task.
+description: Implement the next eligible task from the master plan end-to-end on a feature branch. Apply the relevant Software Repository Guidelines before review, run AFK by default, use Telegram checkpoints only for true human decisions/verification/DB/security confirmation, run automatic task review with two fix retries, create/merge the PR, sync main, and return for the master workflow to start the next task.
 ---
 
 # Mastra Implement Next Task
@@ -39,6 +39,11 @@ Immediately flip the selected pointer `[ ]→[~]` before doing implementation wo
 
 Read the selected task file in full: branch, AFK items, checkpoint items, acceptance criteria, implementation notes, and referenced decision docs.
 
+Invoke `mastra-software-repository-guidelines` in implement mode before coding. Supply the task,
+repository state, declared guideline references, and affected capabilities. Do not rely on planning
+having selected every relevant reference. Record the references loaded, applicable items, and expected
+proof in the task log.
+
 ### 2. Prepare the branch
 
 Check the working tree. If local uncommitted work would be overwritten, stop for a Telegram checkpoint before changing branches.
@@ -55,12 +60,19 @@ Build the AFK items. Follow the repo’s testing conventions and use test-first 
 
 Do not bend tests to pass. Fix root causes.
 
+After implementation, verify the retained implement-mode requirements against repository files,
+commands, and CI configuration where applicable, and record the resulting proof. Reinvoke
+`mastra-software-repository-guidelines` only if implementation expanded the affected capabilities
+beyond the original result; merge any newly applicable requirements into that result. Fix missing
+current-task requirements before review. Future guidelines that do not yet apply are not task blockers.
+
 ### 5. Run automatic task review
 
 Invoke `mastra-task-review` with:
 
 - `base=main`
 - `spec=` the verbatim task file plus referenced decision docs
+- `repository-guidelines=` the implement-mode result, including loaded references and proof
 - `attempt=initial`
 
 `mastra-task-review` returns structured findings only. It does not write review files and does not ask the user. You get two retry rounds after the initial review before escalating to diagnosis.
@@ -89,6 +101,7 @@ Update the task file with:
 - checked AFK/checkpoint/acceptance items that are actually complete,
 - implementation notes,
 - verification commands and results,
+- Software Repository Guidelines references loaded, applicable items, and proof,
 - review attempt summary,
 - end-to-end proof result or concrete reason for substitute proof,
 - README decision,
@@ -113,6 +126,7 @@ Return to `mastra-workflow` only after this selected task is closed out or after
 - One task per invocation.
 - Never build a dependency-blocked task.
 - Never skip required tests/checks.
+- Never skip the pre-implementation guideline invocation or its evidence verification before review.
 - Never treat a review file as the product; review is an automatic gate.
 - Never end because of CI, merge, review, DB, or security blockers. Recover, diagnose, or wait through Telegram.
 - Only explicit user stop or successful task closeout ends this skill invocation.

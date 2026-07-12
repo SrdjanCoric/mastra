@@ -58,12 +58,8 @@ export function formatUnsupportedTelegramCommand(command: string): string {
   return `Unsupported Telegram command or arguments: ${command}. Use /help here; thread, model, settings, shell, and privileged controls are terminal-only.`;
 }
 
-export function formatThreadNotice(
-  prefix: 'Following thread' | 'Now following thread',
-  title: string | undefined,
-  id: string,
-): string {
-  return `${prefix}: ${formatThreadReference(title, id)}`;
+export function formatThreadNotice(title: string | undefined, id: string): string {
+  return `Now following thread: ${formatThreadReference(title, id)}`;
 }
 
 export function formatThreadReference(title: string | undefined, id: string): string {

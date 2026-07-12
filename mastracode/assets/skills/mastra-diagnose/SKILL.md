@@ -163,6 +163,14 @@ Required before declaring done:
 - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
 - [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
 
+Reuse a supplied Software Repository Guidelines result when it covers the repaired surface. Invoke
+`mastra-software-repository-guidelines` in review mode only when diagnosis is standalone, no current
+result is available, or the fix expands the guideline-relevant surface—for example, test
+infrastructure, CI, security, architecture, or repository safeguards. A narrow fix inside the managed
+workflow does not reinvoke it because `mastra-task-review` independently runs the guideline gate.
+When invoked, load only relevant references. Record concrete remaining gaps as follow-up work; do not
+turn unrelated future guideline items into blockers for the bug fix.
+
 **Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling), propose it to the user as a follow-up architectural task with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
 
 ## Running out of room — hand off

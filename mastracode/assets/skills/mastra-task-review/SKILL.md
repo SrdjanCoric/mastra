@@ -1,6 +1,6 @@
 ---
 name: mastra-task-review
-description: Review a completed task branch as an automatic blocking gate for mastra-implement-next-task. Fan out independent Standards, Spec, Bug, and conditional Security lenses, return structured findings only, and never write review files or ask the user directly.
+description: Review a completed task branch as an automatic blocking gate for mastra-implement-next-task. Independently invoke the Software Repository Guidelines, fan out Standards, Spec, Bug, and conditional Security lenses, return structured findings only, and never write review files or ask the user directly.
 ---
 
 # Mastra Task Review
@@ -28,6 +28,7 @@ Accept these inputs from the caller:
 
 - `base`: fixed diff base. Default is `main` only when the caller did not pass a base.
 - `spec`: path or verbatim spec/task text. In workflow mode this must be supplied by the caller.
+- `repository-guidelines`: the caller's implement-mode result, including loaded references and proof.
 - `attempt`: optional review attempt label, such as `initial`, `retry-1`, or `retry-2`; include it in returned metadata if available.
 
 If invoked standalone without enough inputs, resolve what you can from the repo, but still keep the same output rule: structured findings only, no review file.
@@ -42,6 +43,12 @@ Capture:
 - `git log <base>..HEAD --oneline`
 - the supplied spec/task text
 - repo standards docs when present: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `CONTEXT.md`, ADRs, style docs, test conventions, lint/test configs
+- the caller's Software Repository Guidelines result and proof, when supplied
+
+Always invoke `mastra-software-repository-guidelines` in review mode. Give it the task/spec, actual
+diff, repository state, caller result, and claimed proof. It must independently select relevant
+references so an omitted planning reference cannot hide an applicable requirement. If the skill is
+unavailable or was not invoked, return a blocker finding rather than silently skipping this gate.
 
 If the diff is empty, return one blocker finding explaining that there is no task diff to review.
 
@@ -63,7 +70,7 @@ If any signal appears, include the Security lens. If no signal appears, skip Sec
 
 Use separate review contexts/agents for each active lens so one judgment does not contaminate another.
 
-- **Standards**: documented conventions and test quality.
+- **Standards**: documented conventions, test quality, and the independently selected Software Repository Guidelines requirements that apply to this task or are already established in the repository.
 - **Spec**: faithfulness to the supplied task/spec; missing requirements and scope creep.
 - **Bug**: correctness, edge cases, race conditions, lifecycle errors, error handling, simplification.
 - **Security**: only when selected in step 2.
@@ -77,6 +84,7 @@ Merge exact duplicates while preserving all axes that reported the issue. Do not
 - base
 - attempt, if supplied
 - security lens status: `run` or `skipped-no-security-surface`
+- Software Repository Guidelines status: `run`, references loaded, applicable items, and proof gaps
 - counts by axis/severity
 
 ## Finding schema
@@ -107,7 +115,11 @@ Rules:
 
 ### Standards
 
-Read the standards docs, then the diff. Report violations of documented rules and meaningful test-quality issues. Skip formatting/lint issues that tooling already enforces. Return only findings with `axis: "standards"`.
+Read the repository standards docs and the review-mode result from
+`mastra-software-repository-guidelines`, then the diff. Report violations of documented rules,
+missing current-task guideline requirements, unsupported completion claims, and meaningful test-quality
+issues. Do not report future guideline items that do not yet apply to this task. Skip formatting/lint
+issues that tooling already enforces. Return only findings with `axis: "standards"`.
 
 ### Spec
 

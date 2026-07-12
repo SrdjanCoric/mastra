@@ -1,13 +1,14 @@
 ---
 name: mastra-workflow
-description: End-to-end Mastra autopilot loop — mastra-talk-it-through → mastra-to-plan → loop { mastra-implement-next-task → mastra-task-review → mastra-create-pr → mastra-sync-main } until every task in the master plan is done or the user explicitly stops it. Pass --run to skip planning and run the existing master plan. Checkpoints wait/resume through Telegram rather than ending the workflow.
+description: End-to-end Mastra autopilot loop — mastra-talk-it-through → mastra-software-repository-guidelines → mastra-to-plan → loop { mastra-implement-next-task → mastra-task-review → mastra-create-pr → mastra-sync-main } → final repository-guidelines assessment. Runs until every task and applicable repository guideline is complete or the user explicitly stops it. Pass --run to skip interview and planning. Checkpoints wait/resume through Telegram rather than ending the workflow.
 ---
 
 # Mastra Workflow
 
 The **top-level autopilot loop**. This skill owns the orchestration; each sub-skill does one thing
-and returns. The workflow drives them in order until the master plan is complete or the user sends
-an explicit stop command. Problems are recovered autonomously or escalated through the active
+and returns. The workflow drives them in order until both the master plan is complete and the final
+Software Repository Guidelines assessment passes, or the user sends an explicit stop command. Problems are
+recovered autonomously or escalated through the active
 user-input channel without ending the run.
 
 ## Skills invoked by this workflow
@@ -16,6 +17,7 @@ The workflow must invoke the MastraCode-specific skills below by their exact IDs
 similarly named generic skills, such as `task-review`, `implement-next-task`, or `sync-main`.
 
 - **`mastra-talk-it-through`** is invoked to interview the user and settle decisions.
+- **`mastra-software-repository-guidelines`** is invoked selectively during interview, planning, implementation, and review, then across every guideline section before the workflow reports completion.
 - **`mastra-to-plan`** is invoked to write dependency-aware task files and update the master plan.
 - **`mastra-implement-next-task`** is invoked once for each eligible task.
 - **`mastra-task-review`** is invoked by `mastra-implement-next-task` as its automatic review-only gate.
@@ -41,6 +43,11 @@ Resolve every `[decision]` here — nothing may be deferred into an autopilot ta
 also writes/amends `ARCHITECTURE.md` at the repo root when durable decisions crystallize, and
 ensures `CLAUDE.md`/`AGENTS.md` carries a one-line pointer to it.
 
+During the interview, `mastra-talk-it-through` must invoke `mastra-software-repository-guidelines`
+in scope mode. The Planner Brief must record relevant guideline sections, existing gaps, requirements
+for this work, and items that can remain for later tasks. Do not load the complete guideline set unless
+the interview itself is a full repository assessment.
+
 Return only when the user and the skill have both concluded, with the coverage recap in chat.
 
 ### 2. Plan — `mastra-to-plan`
@@ -62,12 +69,17 @@ must-be-human work. Supported tags are `[decision]`, `[verify]`, `[confirm-db]`,
 work is AFK, while real/shared/destructive/ambiguous DB work and security-sensitive actions get the
 explicit confirm tags.
 
+`mastra-to-plan` must invoke `mastra-software-repository-guidelines` in scope mode rather than
+assuming the interview selected every relevant section. Each task records only its applicable
+guideline references, requirements, and proof. Future guidelines are assigned to the task where they
+become relevant instead of blocking earlier vertical slices.
+
 If task dependencies materially change the user's confirmed intent, present the proposed edges and wait for confirmation. Otherwise let `mastra-to-plan` write the plan from the confirmed interview recap without forcing a second prompt.
 
 ### 3. Loop — one iteration per task
 
-Loop until the master plan is complete or the user explicitly stops the run. **Each iteration is a
-fixed four-step sequence.** Skip no step. Checkpoints do not end the workflow: `[decision]`,
+Loop until both the master plan is complete and the final Software Repository Guidelines assessment
+passes, or the user explicitly stops the run. **Each iteration is a fixed four-step sequence.** Skip no step. Checkpoints do not end the workflow: `[decision]`,
 `[verify]`, `[confirm-db]`, and `[confirm-security]` are Telegram wait/resume moments owned by
 `mastra-implement-next-task`. If a sub-skill encounters a problem, recover it or wait for Telegram
 input and then resume the same iteration (see **Recovery and escalation** below).
@@ -87,10 +99,15 @@ again** after each iteration returns, until no eligible pointer remains.
 **Between iterations:**
 
 1. Read the master plan's `## Tasks` list directly (it's small).
-2. If every pointer is `[x]` → the plan is complete. Break the loop and report **"plan complete"**.
-3. If at least one pointer is `[ ]` and its `(after …)` deps are all `[x]` → run
+2. If every pointer is `[x]`, invoke `mastra-software-repository-guidelines` in final-assessment mode
+   and load every bundled reference. If an applicable item remains incomplete, use `mastra-to-plan`
+   to add the smallest remediation task or tasks, then continue the loop. Ask the user only when
+   applicability or intended repository behavior is a genuine decision.
+3. Only when every pointer is `[x]` and the final guideline assessment has no unaddressed applicable
+   item may the workflow report **"plan complete"**.
+4. If at least one pointer is `[ ]` and its `(after …)` deps are all `[x]` → run
    `mastra-implement-next-task` again for the next iteration.
-4. If no `[ ]` pointer is eligible but some remain (for example, an unmerged `[>]` while CI is
+5. If no `[ ]` pointer is eligible but some remain (for example, an unmerged `[>]` while CI is
    still running), inspect and recover the incomplete prior iteration. Wait for CI, retry the
    responsible sub-skill, or ask the user through the available input tool and wait for their
    Telegram reply. Do not end the workflow because the plan is temporarily blocked or because a
@@ -103,9 +120,14 @@ iteration, verify each item explicitly. If any item fails, run the responsible M
 fix the state. If safe recovery requires the user, ask through the available input tool, wait for the
 Telegram reply, and continue instead of returning.
 
-- Skill identity: only `mastra-*` skills were used for the loop (`mastra-implement-next-task`,
-  `mastra-task-review`, `mastra-diagnose`, `mastra-handoff`, `mastra-create-pr`, `mastra-sync-main`,
-  `mastra-write-well` when prose is written). Generic similarly named skills are not substitutes.
+- Skill identity: only `mastra-*` skills were used for the loop (`mastra-software-repository-guidelines`,
+  `mastra-implement-next-task`, `mastra-task-review`, `mastra-diagnose`, `mastra-handoff`,
+  `mastra-create-pr`, `mastra-sync-main`, `mastra-write-well` when prose is written). Generic
+  similarly named skills are not substitutes.
+- Guideline invocation: the Planner Brief, task file, implementation log, and task-review metadata
+  record the applicable Software Repository Guidelines references and proof for their stage.
+- Final guideline assessment: before reporting plan completion, every bundled guideline reference was
+  loaded and no applicable item remained unaddressed.
 - Iteration closeout: the task selected at the start of the iteration is `[x]` after the iteration,
   points to `tasks/done/...`, and has its task file under `plans/tasks/done/`.
 - Task file completeness: the done task file has checked AFK items, checked acceptance criteria, an
@@ -146,8 +168,9 @@ policy:
 - **Merge failure** — diagnose conflicts, branch protection, or unresolved conversations; repair
   what is safe, otherwise ask through Telegram and wait. Never force-merge.
 
-Only explicit user stop or completed master plan ends the workflow. A user reply resumes the same
-process; do not require them to re-invoke `mastra-workflow`.
+Only explicit user stop or a completed master plan with a passing final Software Repository Guidelines
+assessment ends the workflow. A user reply resumes the same process; do not require them to re-invoke
+`mastra-workflow`.
 
 ## Arguments
 
@@ -178,7 +201,8 @@ wait for the reply, register it, and continue.
 - One task per loop iteration, in full.
 - Never bypass a `blocker`/`major` review finding, a security finding, red CI, or a failed merge.
   Recover it or ask through Telegram and wait, but keep the workflow process alive.
-- The master plan plus explicit user stop are the loop's only termination conditions. Read the plan
-  directly between iterations; it is small.
+- Explicit user stop or a completed master plan plus a passing final
+  `mastra-software-repository-guidelines` assessment are the loop's only termination conditions. Read
+  the plan directly between iterations; it is small.
 - Every human escalation uses the available user-input tool so `mastracode-remote` can deliver it to
   the matching Telegram topic and resume the same run from the reply.

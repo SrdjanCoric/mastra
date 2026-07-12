@@ -174,6 +174,30 @@ describe('MastraTUI queueing', () => {
     expect(sendMessage.mock.calls[1]?.[0]).toContain('terminal-only');
   });
 
+  it('does not report Telegram as unavailable when one send fails on an active connection', async () => {
+    const sendMessage = vi.fn().mockRejectedValue(new Error('temporary send failure'));
+    const state = {
+      options: { messageBridge: { sendMessage, health: () => 'connected' } },
+      session: { run: { isRunning: vi.fn(() => false) } },
+    };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      receiveExternalMessage: (message: { text: string }) => Promise<void>;
+    };
+    tui.state = state;
+
+    await tui.receiveExternalMessage({ text: '/help' });
+
+    expect(mocks.showInfo).toHaveBeenCalledWith(
+      state,
+      'A Telegram message could not be delivered, but the connection is still active.',
+    );
+    expect(mocks.showInfo).not.toHaveBeenCalledWith(
+      state,
+      'Telegram is temporarily unavailable. The terminal session is still active.',
+    );
+  });
+
   it('returns safe Telegram status without tool arguments or transcripts', async () => {
     const sendMessage = vi.fn().mockResolvedValue(undefined);
     const state = {

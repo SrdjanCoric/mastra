@@ -9,7 +9,9 @@
     "!dist/headless",
     "assets/skills",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE.md",
+    "SECURITY.md"
   ],
   "homepage": "https://github.com/SrdjanCoric/mastra/tree/main/mastracode#readme",
   "repository": {
@@ -86,6 +88,7 @@
     "e2e:list": "tsx e2e-list.ts",
     "e2e:smoke": "vitest run --config e2e/vitest.shards.config.ts",
     "e2e:test": "MC_E2E_VITEST_SCENARIOS=all vitest run --config e2e/vitest.shards.config.ts",
+    "verify:publication-package": "tsx src/scripts/verify-publication-package.ts",
     "web:build": "mastra build --dir src/mastra",
     "web:start": "mastra start --env src/web/.env"
   },

@@ -17,6 +17,7 @@ type PackageJson = {
   types?: string;
   bin?: Record<string, string>;
   exports?: Record<string, unknown>;
+  scripts?: Record<string, string>;
   engines?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -46,7 +47,9 @@ describe('mastracode package metadata', () => {
     });
     expect(pkg.homepage).toBe('https://github.com/SrdjanCoric/mastra/tree/main/mastracode#readme');
     expect(pkg.bugs).toEqual({ url: 'https://github.com/SrdjanCoric/mastra/issues' });
-    expect(pkg.files).toEqual(expect.arrayContaining(['dist', '!dist/headless', 'CHANGELOG.md']));
+    expect(pkg.files).toEqual(
+      expect.arrayContaining(['dist', '!dist/headless', 'CHANGELOG.md', 'LICENSE.md', 'SECURITY.md']),
+    );
     expect(pkg.bin).toEqual({ 'mastracode-remote': './dist/telegram-cli.js' });
     expect(pkg.bin).not.toHaveProperty('mastracode');
     expect(pkg.bin).not.toHaveProperty('mastracode-telegram');
@@ -68,6 +71,9 @@ describe('mastracode package metadata', () => {
       './package.json': './package.json',
     });
     expect(pkg.exports).not.toHaveProperty('./headless');
+    expect(pkg.scripts?.postinstall).toBeUndefined();
+    expect(pkg.scripts?.['verify:publication-package']).toBe('tsx src/scripts/verify-publication-package.ts');
+    expect(pkg.dependencies?.['@mastracode-remote/mastracode-runtime']).toBeUndefined();
     expect(pkg.engines?.node).toBe('>=22.19.0');
   });
 

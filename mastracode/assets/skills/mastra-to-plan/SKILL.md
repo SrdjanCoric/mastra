@@ -1,6 +1,6 @@
 ---
 name: mastra-to-plan
-description: Turn a source (PRD, decision doc, or the current conversation) into one or more self-contained task files under plans/tasks/, appended as pointers to the project's single master plan. Use when the user wants to break work into tasks, plan a feature, turn a PRD/decision/chat into actionable work, or mentions "tracer bullets". Pass --afk to plan for the autopilot orchestrator — tagging human-in-the-loop work only when strictly necessary.
+description: Turn a source (PRD, decision doc, or the current conversation) into self-contained task files under plans/tasks/, including selectively applicable Software Repository Guidelines requirements, and append pointers to the project's single master plan. Use for planning features or tracer bullets. Pass --afk to plan for the autopilot orchestrator, tagging human-in-the-loop work only when strictly necessary.
 ---
 
 # To Plan
@@ -46,6 +46,11 @@ Find the project's master plan via the **`AGENTS.md` "Active plan"** entry first
 
 If you have not already, explore to understand the current architecture, patterns, and
 integration layers — so tasks are grounded and the architectural header stays accurate.
+
+Invoke `mastra-software-repository-guidelines` in scope mode with the Planner Brief, repository state,
+and proposed work. Do not rely on the interview's selection alone. Record which bundled references
+were loaded, map currently applicable items to the task where they naturally become relevant, and
+leave later-applicable items for later slices. Do not copy the full guideline set into the plan.
 
 ### 4. Draft vertical slices
 
@@ -129,7 +134,9 @@ plans/tasks/ and plans/tasks/done/) + 1`, zero-padded to four digits. Filename:
 Self-contained means the file carries everything the implementer needs — the relevant user
 stories and acceptance criteria distilled from the source — so implementation never has to reach
 back to the PRD. Reference durable decisions by pointing at the master plan header or a decision
-doc; don't duplicate them.
+doc; don't duplicate them. For Software Repository Guidelines, name the relevant bundled reference
+files and include only the applicable requirements and proof; the implementer invokes the skill to
+load their full wording.
 
 <task-file-template>
 # Task NNNN: <Title>
@@ -142,6 +149,12 @@ doc; don't duplicate them.
 
 A concise description of this vertical slice — the end-to-end behavior, not layer-by-layer
 implementation.
+
+## Software Repository Guidelines
+
+**Applicable references**: <only the bundled reference files relevant to this task>
+
+- [ ] <applicable requirement and its expected repository/command/CI proof>
 
 ## AFK tasks
 
