@@ -35,7 +35,7 @@ Close the publication gate for `mastracode-remote` with automated end-to-end and
 Completed on 2026-07-12.
 
 - Added an isolated publication-package verifier that packs only `mastracode/`, installs it under a temporary prefix, checks executable coexistence, runs the package readiness path, confirms the archive contents, and verifies that legacy state and launchd sentinels remain untouched.
-- Updated the package README, metadata tests, release metadata, license, and private vulnerability-reporting policy. The README covers setup, commands, security, runtime state, tmux, troubleshooting, recovery, 0.1.x migration, limitations, and cleanup.
+- Updated the package README, metadata tests, release metadata, and license. The README covers setup, commands, security, runtime state, tmux, troubleshooting, recovery, 0.1.x migration, limitations, and cleanup.
 - Refreshed the bundled managed skills from `~/.mastracode/skills`, added `mastra-software-repository-guidelines`, and kept teaching and PRD skills out of the package assets.
 - Removed the redundant Telegram startup notice. Questions, approvals, completed responses, explicit command replies, thread-change notices, and recovery notices remain enabled.
 - Automated proof: `pnpm exec vitest run src/telegram/skills.test.ts src/telegram/setup.test.ts src/telegram/session-commands.test.ts src/tui/__tests__/mastra-tui-queueing.test.ts src/tui/__tests__/mastra-tui-hooks.test.ts src/__tests__/package-metadata.test.ts --reporter=dot --bail 1` passed 83 tests in 6 files.

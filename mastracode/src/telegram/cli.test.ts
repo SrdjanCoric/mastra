@@ -6,10 +6,23 @@ describe('runTelegramCli', () => {
   it('routes --init to the Telegram initializer', async () => {
     const initialize = vi.fn().mockResolvedValue(undefined);
     const startTui = vi.fn().mockResolvedValue(undefined);
+    const showHelp = vi.fn();
 
-    await runTelegramCli(['--init'], { initialize, startTui });
+    await runTelegramCli(['--init'], { initialize, startTui, showHelp });
 
     expect(initialize).toHaveBeenCalledOnce();
+    expect(startTui).not.toHaveBeenCalled();
+  });
+
+  it('shows package help without requiring Telegram initialization', async () => {
+    const initialize = vi.fn().mockResolvedValue(undefined);
+    const startTui = vi.fn().mockResolvedValue(undefined);
+    const showHelp = vi.fn();
+
+    await runTelegramCli(['--help'], { initialize, startTui, showHelp });
+
+    expect(showHelp).toHaveBeenCalledOnce();
+    expect(initialize).not.toHaveBeenCalled();
     expect(startTui).not.toHaveBeenCalled();
   });
 
@@ -17,8 +30,14 @@ describe('runTelegramCli', () => {
     const initialize = vi.fn().mockResolvedValue(undefined);
     const startTui = vi.fn().mockResolvedValue(undefined);
     const startBroker = vi.fn().mockResolvedValue(undefined);
+    const showHelp = vi.fn();
 
-    await runTelegramCli(['--broker', '--home-dir', '/tmp/test-home'], { initialize, startTui, startBroker });
+    await runTelegramCli(['--broker', '--home-dir', '/tmp/test-home'], {
+      initialize,
+      startTui,
+      startBroker,
+      showHelp,
+    });
 
     expect(startBroker).toHaveBeenCalledWith('/tmp/test-home');
     expect(startTui).not.toHaveBeenCalled();
@@ -27,8 +46,9 @@ describe('runTelegramCli', () => {
   it('rejects --init when combined with stock TUI arguments', async () => {
     const initialize = vi.fn().mockResolvedValue(undefined);
     const startTui = vi.fn().mockResolvedValue(undefined);
+    const showHelp = vi.fn();
 
-    await expect(runTelegramCli(['--init', '--help'], { initialize, startTui })).rejects.toThrow(
+    await expect(runTelegramCli(['--init', '--help'], { initialize, startTui, showHelp })).rejects.toThrow(
       'Usage: mastracode-remote --init',
     );
     expect(initialize).not.toHaveBeenCalled();

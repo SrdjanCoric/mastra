@@ -69,6 +69,14 @@ export function createTelegramCliHandlers(dependencies: TelegramCliEntryDependen
       write(`Workflow skills: ${result.skills.length} verified.`);
       write('Next: run `mastracode-remote` from this project.');
     },
+    showHelp: () => {
+      write('MastraCode Remote');
+      write('');
+      write('Usage:');
+      write('  mastracode-remote          Start the visible MastraCode TUI with Telegram');
+      write('  mastracode-remote --init   Initialize Telegram for the current project');
+      write('  mastracode-remote --help   Show this help');
+    },
     startTui: async () => {
       const readiness = assertTelegramInitialized(paths.readinessFile, projectPath);
       process.env.MASTRACODE_SKILLS_SCOPE = 'mastracode';

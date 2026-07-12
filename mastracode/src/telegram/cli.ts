@@ -1,5 +1,6 @@
 export interface TelegramCliHandlers {
   initialize: () => Promise<void>;
+  showHelp: () => void;
   startTui: () => Promise<void>;
   startBroker?: (homeDir: string) => Promise<void>;
 }
@@ -12,6 +13,13 @@ export async function runTelegramCli(args: string[], handlers: TelegramCliHandle
       throw new Error('Invalid internal Telegram broker invocation.');
     }
     await handlers.startBroker(homeDir);
+    return;
+  }
+  if (args[0] === '--help' || args[0] === '-h') {
+    if (args.length !== 1) {
+      throw new Error('Usage: mastracode-remote [--init|--help]');
+    }
+    handlers.showHelp();
     return;
   }
   if (args.includes('--init')) {
