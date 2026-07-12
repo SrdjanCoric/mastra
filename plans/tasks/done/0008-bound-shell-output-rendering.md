@@ -34,3 +34,4 @@ Fix the shell-output display path without changing command execution or the resu
 - Bounded the controller's active-tool shell display state and clear it on success, failure, and abort so the TUI and controller do not retain duplicate growing strings.
 - Added deterministic retained-character and scheduled-rebuild assertions, plus the checked-in `shell-output-batching` TUI scenario. The scenario renders 500 stdout and 500 stderr lines, reaches the final assistant result, and accepts the next terminal message.
 - Proof: 77 focused MastraCode component and handler tests passed; 100 focused core display-state tests passed; the `shell-output-batching` TUI scenario passed; MastraCode and core typechecks, MastraCode lint, and `pnpm build:mastracode` passed.
+- Merged in PR #9 with merge commit `60b1ea8f356cb07f119e0c2c64543be57d19531b`.
