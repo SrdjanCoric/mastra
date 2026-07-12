@@ -61,18 +61,84 @@ describe('TelegramBroker', () => {
     expect(telegram.getTextUpdates).toHaveBeenNthCalledWith(2, 9, expect.any(AbortSignal));
   });
 
-  it('runs connectivity verification through the active poller without delivering the marker', async () => {
+  it.each(['lowercase', 'capitalized', 'uppercase', 'surrounding whitespace'] as const)(
+    'sends the verification code separately and accepts the %s reply variant without delivering it',
+    async variant => {
+      const { broker, telegram } = createBroker();
+      const deliver = vi.fn();
+      broker.register('one', { projectPath: '/projects/one', threadId: 101 }, deliver);
+
+      const verification = broker.verifyRoundTrip(101, 1000);
+      await vi.waitFor(() => expect(telegram.sendMessage).toHaveBeenCalledTimes(2));
+      const marker = String(telegram.sendMessage.mock.calls[1]?.[1]);
+      const code = marker.slice('verify '.length);
+      const reply =
+        variant === 'lowercase'
+          ? marker.toLowerCase()
+          : variant === 'capitalized'
+            ? `Verify ${code}`
+            : variant === 'uppercase'
+              ? marker.toUpperCase()
+              : `  Verify ${code.toLowerCase()}  `;
+      await broker.processUpdate({ updateId: 1, userId: 42, threadId: 101, text: reply });
+      await verification;
+
+      expect(telegram.sendMessage).toHaveBeenNthCalledWith(
+        1,
+        101,
+        'MastraCode Remote verification. Reply in this topic with the code in the next message.',
+      );
+      expect(telegram.sendMessage).toHaveBeenNthCalledWith(2, 101, marker);
+      expect(marker).toMatch(/^verify [A-F0-9]{6}$/);
+      expect(deliver).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps wrong users, topics, and codes out of successful verification', async () => {
     const { broker, telegram } = createBroker();
     const deliver = vi.fn();
     broker.register('one', { projectPath: '/projects/one', threadId: 101 }, deliver);
 
     const verification = broker.verifyRoundTrip(101, 1000);
-    await vi.waitFor(() => expect(telegram.sendMessage).toHaveBeenCalledOnce());
-    const marker = String(telegram.sendMessage.mock.calls[0]?.[1]).split('exactly: ')[1];
-    await broker.processUpdate({ updateId: 1, userId: 42, threadId: 101, text: marker });
-    await verification;
+    await vi.waitFor(() => expect(telegram.sendMessage).toHaveBeenCalledTimes(2));
+    const marker = String(telegram.sendMessage.mock.calls[1]?.[1]);
 
-    expect(deliver).not.toHaveBeenCalled();
+    await expect(broker.processUpdate({ updateId: 1, userId: 7, threadId: 101, text: marker })).resolves.toBe(
+      'ignored',
+    );
+    await expect(broker.processUpdate({ updateId: 2, userId: 42, threadId: 202, text: marker })).resolves.toBe(
+      'unprocessed',
+    );
+    await expect(broker.processUpdate({ updateId: 3, userId: 42, threadId: 101, text: 'verify WRONG' })).resolves.toBe(
+      'delivered',
+    );
+    expect(deliver).toHaveBeenCalledWith({ type: 'message', text: 'verify WRONG' });
+
+    await broker.processUpdate({ updateId: 4, userId: 42, threadId: 101, text: marker });
+    await verification;
+  });
+
+  it('cleans up verification waiters after timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const { broker, telegram } = createBroker();
+      const deliver = vi.fn();
+      broker.register('one', { projectPath: '/projects/one', threadId: 101 }, deliver);
+
+      const verification = broker.verifyRoundTrip(101, 100);
+      const rejection = expect(verification).rejects.toThrow('Timed out waiting for the Telegram verification reply.');
+      await vi.waitFor(() => expect(telegram.sendMessage).toHaveBeenCalledTimes(2));
+      const marker = String(telegram.sendMessage.mock.calls[1]?.[1]);
+      await vi.advanceTimersByTimeAsync(100);
+
+      await rejection;
+      await expect(broker.processUpdate({ updateId: 1, userId: 42, threadId: 101, text: marker })).resolves.toBe(
+        'delivered',
+      );
+      expect(deliver).toHaveBeenCalledWith({ type: 'message', text: marker });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('sends project output only to the registered topic', async () => {
@@ -158,7 +224,9 @@ describe('TelegramBroker', () => {
     };
     const broker = new TelegramBroker({ allowedUserId: 42, telegram, stateStore });
     const delivered: string[] = [];
-    broker.register('one', { projectPath: '/projects/one', threadId: 101 }, message => delivered.push(message.text));
+    broker.register('one', { projectPath: '/projects/one', threadId: 101 }, message => {
+      delivered.push(message.text);
+    });
 
     const polling = broker.startPolling({ intervalMs: 0 });
     await vi.waitFor(() => expect(delivered).toEqual(['nine', 'ten']));
