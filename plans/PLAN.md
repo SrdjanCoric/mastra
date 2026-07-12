@@ -49,4 +49,4 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [ ] 0013 · Simplify Telegram init verification (after 0015) → tasks/0013-simplify-telegram-init-verification.md
 - [ ] 0014 · Debug Mastra workflow continuation (after 0016) → tasks/0014-debug-mastra-workflow-continuation.md
 - [ ] 0015 · Acknowledge every Telegram message (after 0014) → tasks/0015-acknowledge-every-telegram-message.md
-- [ ] 0016 · Speed up MastraCode Remote CI and prepare 0.2.4 (after 0012) → tasks/0016-speed-up-mastracode-remote-ci.md
+- [~] 0016 · Speed up MastraCode Remote CI and prepare 0.2.4 (after 0012) → tasks/0016-speed-up-mastracode-remote-ci.md

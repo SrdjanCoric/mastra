@@ -17,7 +17,6 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-      - 'plans/**'
   push:
     branches: [main]
     paths:
@@ -34,7 +33,6 @@ on:
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
-      - 'plans/**'
   workflow_dispatch:
 
 permissions:
@@ -47,46 +45,70 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Validate package
+  dependency-review:
+    name: Review dependencies
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-
+    timeout-minutes: 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9
-        with:
-          languages: javascript-typescript
-          config-file: ./.github/codeql/mastracode-remote.yml
-
-      - name: Setup pnpm and Node.js
-        uses: ./.github/actions/setup-pnpm-node
-
       - name: Review dependency changes
-        if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
         with:
           fail-on-severity: high
           comment-summary-in-pr: never
 
+  quality:
+    name: Quality and type checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Setup pnpm and Node.js
+        uses: ./.github/actions/setup-pnpm-node
       - name: Restore Turbo build cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: .turbo
-          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-quality-${{ github.sha }}
           restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-quality-
             turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - name: Build MastraCode dependencies
+        run: pnpm build:mastracode
+      - name: Run quality and type checks
+        run: pnpm check:mastracode:quality
 
-      - name: Run MastraCode Remote checks
-        run: pnpm check:mastracode
-
+  tests:
+    name: Tests and performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Setup pnpm and Node.js
+        uses: ./.github/actions/setup-pnpm-node
+      - name: Restore Turbo build cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-tests-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-tests-
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - name: Build MastraCode dependencies
+        run: pnpm build:mastracode
+      - name: Run tests and performance checks
+        run: pnpm check:mastracode:tests
       - name: Upload coverage report
-        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: mastracode-coverage
@@ -94,7 +116,71 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  package:
+    name: Verify release package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Setup pnpm and Node.js
+        uses: ./.github/actions/setup-pnpm-node
+      - name: Restore Turbo build cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-package-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-package-
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - name: Build MastraCode dependencies
+        run: pnpm build:mastracode
+      - name: Verify release configuration and package
+        run: pnpm check:mastracode:package
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9
+        with:
+          languages: javascript-typescript
+          config-file: ./.github/codeql/mastracode-remote.yml
       - name: Analyze source with CodeQL
         uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9
         with:
           category: /language:javascript-typescript
+
+  validate:
+    name: Validate package
+    if: always()
+    needs: [dependency-review, quality, tests, package, codeql]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation job
+        env:
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+          CODEQL_RESULT: ${{ needs.codeql.result }}
+        run: |
+          if [[ "$DEPENDENCY_REVIEW_RESULT" != "success" && "$DEPENDENCY_REVIEW_RESULT" != "skipped" ]]; then
+            echo "Dependency review ended with $DEPENDENCY_REVIEW_RESULT." >&2
+            exit 1
+          fi
+          for result in "$QUALITY_RESULT" "$TESTS_RESULT" "$PACKAGE_RESULT" "$CODEQL_RESULT"; do
+            if [[ "$result" != "success" ]]; then
+              echo "A required MastraCode Remote job ended with $result." >&2
+              exit 1
+            fi
+          done
