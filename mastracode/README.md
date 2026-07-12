@@ -211,28 +211,38 @@ node /path/to/mastra/mastracode/dist/telegram-cli.js
 
 ## Development checks
 
-Run focused tests while changing Telegram behavior:
+Run commands from the repository root. Use a focused test while changing one area:
 
 ```bash
 pnpm --filter ./mastracode exec vitest run src/telegram --reporter=dot --bail 1
 ```
 
-Run package checks before opening a pull request:
+Run the same validation required by the fork's pull request workflow:
 
 ```bash
-pnpm --filter ./mastracode check
-pnpm --filter ./mastracode lint
+pnpm check:mastracode
+```
+
+The complete check runs formatting, linting, strict type checking, unit tests with coverage, the MastraCode build, the shared Telegram TUI scenarios, and the isolated publication-package smoke test. The individual commands are:
+
+```bash
+pnpm format:check:mastracode
+pnpm lint:mastracode
+pnpm typecheck:mastracode
+pnpm --filter ./mastracode verify:release-configuration
+pnpm test:coverage:mastracode
 pnpm build:mastracode
-pnpm --filter ./mastracode run verify:publication-package
+pnpm test:integration:mastracode
+pnpm --filter ./mastracode verify:publication-package
 ```
 
-Run the checked-in Telegram conversation and recovery scenarios with:
+Coverage reports are written to `mastracode/coverage/`. Pull request CI stores the report as an artifact and enforces the checked-in baseline floors in `vitest.config.ts`.
 
-```bash
-MC_E2E_VITEST_SCENARIOS=telegram-shared-conversation,telegram-recovery \
-  pnpm --filter ./mastracode exec vitest run \
-  --config e2e/vitest.config.ts --reporter=dot
-```
+## Releases
+
+The `Release MastraCode Remote` GitHub workflow publishes from `main` after package validation. It builds one archive, records its SHA-256 digest and size, then publishes that archive through npm trusted publishing with provenance. The workflow does not use a stored npm token.
+
+The npm trusted publisher must be restricted to the `SrdjanCoric/mastra` repository, the `mastracode-remote-release.yml` workflow, and the `npm-release` environment. The environment should require approval before publication.
 
 ## Mastra Code
 

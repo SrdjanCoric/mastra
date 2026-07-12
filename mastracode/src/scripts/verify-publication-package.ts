@@ -1,10 +1,22 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const MAX_ARCHIVE_BYTES = 5 * 1024 * 1024;
+const MAX_UNPACKED_BYTES = 20 * 1024 * 1024;
+
+async function directoryBytes(directory: string): Promise<number> {
+  let bytes = 0;
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    bytes += entry.isDirectory() ? await directoryBytes(entryPath) : (await fs.stat(entryPath)).size;
+  }
+  return bytes;
+}
 
 function run(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): string {
   const result = spawnSync(command, args, {
@@ -57,6 +69,24 @@ async function main(): Promise<void> {
     const archiveName = (await fs.readdir(packDir)).find(file => file.endsWith('.tgz'));
     assert(archiveName, 'pnpm pack did not create an archive.');
     const archivePath = path.join(packDir, archiveName);
+    const archiveBytes = (await fs.stat(archivePath)).size;
+    const archiveSha256 = createHash('sha256')
+      .update(await fs.readFile(archivePath))
+      .digest('hex');
+    assert(
+      archiveBytes <= MAX_ARCHIVE_BYTES,
+      `The archive is ${archiveBytes} bytes, above the ${MAX_ARCHIVE_BYTES}-byte release budget.`,
+    );
+
+    const unpackDir = path.join(root, 'unpacked');
+    await fs.mkdir(unpackDir);
+    run('tar', ['-xzf', archivePath, '-C', unpackDir]);
+    const unpackedBytes = await directoryBytes(unpackDir);
+    assert(
+      unpackedBytes <= MAX_UNPACKED_BYTES,
+      `The unpacked package is ${unpackedBytes} bytes, above the ${MAX_UNPACKED_BYTES}-byte release budget.`,
+    );
+
     const archiveFiles = run('tar', ['-tzf', archivePath]).split('\n');
     assert(archiveFiles.includes('package/README.md'), 'The archive is missing README.md.');
     assert(archiveFiles.includes('package/LICENSE.md'), 'The archive is missing LICENSE.md.');
@@ -68,6 +98,10 @@ async function main(): Promise<void> {
     assert(
       !archiveFiles.some(file => /^package\/dist\/headless(?:[/.]|$)/.test(file)),
       'The archive contains the removed headless runtime.',
+    );
+    assert(
+      !archiveFiles.some(file => /(^|\/)\.env(?:\.|$)/.test(file) || file.includes('.mastracode-telegram/')),
+      'The archive contains local credentials or runtime state.',
     );
 
     const packedPackage = JSON.parse(run('tar', ['-xOf', archivePath, 'package/package.json'])) as {
@@ -131,7 +165,7 @@ async function main(): Promise<void> {
     );
 
     console.info(
-      `Verified ${archiveName}: isolated install, executable coexistence, archive contents, and legacy state.`,
+      `Verified ${archiveName}: sha256=${archiveSha256} archiveBytes=${archiveBytes} unpackedBytes=${unpackedBytes}, isolated install, executable coexistence, archive contents, and legacy state.`,
     );
   } finally {
     await fs.rm(root, { recursive: true, force: true });

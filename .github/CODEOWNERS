@@ -222,3 +222,6 @@
 /examples/ @wardpeet @abhiaiyer91 @TylerBarnes
 /explorations/ @wardpeet @abhiaiyer91 @TylerBarnes
 /mastracode/ @wardpeet @abhiaiyer91 @TylerBarnes
+
+# Fork ownership. This final catch-all overrides inherited upstream owners.
+* @SrdjanCoric
