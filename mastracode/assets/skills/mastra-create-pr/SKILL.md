@@ -1,11 +1,11 @@
 ---
 name: mastra-create-pr
-description: Commit the completed task branch, push it, write clear PR prose, open the pull request, wait for required checks, and merge it on the happy path. In the managed workflow this skill owns PR creation and merge; mastra-sync-main owns post-merge local sync and plan marker closeout.
+description: Commit the completed task and its plan closeout together, push it, write clear PR prose, open the pull request, wait for required checks, and merge it on the happy path. Mastra-sync-main then verifies the closeout on local main.
 ---
 
 # Mastra Create PR
 
-Create and merge the pull request for a completed task branch. This skill does not close the master-plan marker and does not sync local `main`; `mastra-sync-main` handles post-merge local sync and marker closeout after this skill merges the PR.
+Create and merge the pull request for a completed task branch. The branch must already contain the implementation, an `[x]` master-plan pointer, and the task file under `plans/tasks/done/`. `mastra-sync-main` handles post-merge local sync and verifies that closeout landed.
 
 ## Managed workflow contract
 
@@ -42,7 +42,9 @@ git diff main...HEAD --stat || git diff origin/main...HEAD --stat
 
 Confirm you are not on `main`. If there are unrelated changes, leave them unstaged and report them.
 
-### 2. Stage and commit
+### 2. Confirm task closeout, then stage and commit
+
+Before committing a managed task PR, verify that the same branch contains its completed `[x]` plan pointer, updated link to `plans/tasks/done/`, and moved task file with acceptance, verification, review, and end-to-end proof recorded. Return to `mastra-implement-next-task` if closeout is missing. Do not defer closeout to a second PR.
 
 Stage relevant task changes only. Do not commit secrets or local env files.
 
@@ -84,8 +86,8 @@ When checks and review requirements are satisfied, merge with the repo's normal 
 
 Return the PR URL, PR number, branch name, and merge SHA when available.
 
-Do not flip `[~]→[>]` or `[>]→[x]` yourself unless the caller explicitly asks you to. `mastra-implement-next-task` owns `[~]→[>]` after PR identity exists; `mastra-sync-main` owns `[>]→[x]` after the merge lands on local `main`.
+Do not create post-merge plan edits. `mastra-implement-next-task` owns task closeout on the implementation branch before this skill opens the PR. `mastra-sync-main` verifies that the merged PR carried the closeout onto local `main`.
 
 ## Rule
 
-This skill creates and merges the PR. `mastra-sync-main` performs local post-merge sync and plan closeout so the master workflow has one place that turns `[>]` into `[x]`.
+The implementation and its task closeout ship in one PR. This skill creates and merges that PR; `mastra-sync-main` only synchronizes and verifies it afterward.
