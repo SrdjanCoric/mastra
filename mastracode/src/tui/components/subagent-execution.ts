@@ -13,7 +13,9 @@ import type { TUI } from '@earendil-works/pi-tui';
 import { safeStringify } from '@mastra/core/utils';
 import chalk from 'chalk';
 import { BOX_INDENT, getTermWidth, theme } from '../theme.js';
+import { AdaptiveDisplayScheduler } from './adaptive-display-scheduler.js';
 import type { ChatSpacingKind } from './chat-spacing.js';
+import { MAX_SHELL_PREVIEW_CHARS, MAX_SHELL_PREVIEW_LINES } from './shell-output-preview.js';
 import type { IToolExecutionComponent } from './tool-execution-interface.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +44,8 @@ export type SubagentToolCall = Extract<SubagentActivity, { kind: 'tool' }>;
 
 const MAX_ACTIVITY_LINES = 15;
 const COLLAPSED_LINES = 15;
+const MAX_RETAINED_ACTIVITY_ITEMS = MAX_SHELL_PREVIEW_LINES;
+const MAX_RETAINED_ACTIVITY_CHARS = MAX_SHELL_PREVIEW_CHARS;
 
 export interface SubagentExecutionOptions {
   /** When true, auto-collapse to a single summary line on completion. Default false. */
@@ -78,6 +82,8 @@ export class SubagentExecutionComponent extends Container implements IToolExecut
   private modelId?: string;
   private activity: SubagentActivity[] = [];
   private lastTextSnapshot = '';
+  private lastTextSnapshotLength = 0;
+  private readonly displayScheduler: AdaptiveDisplayScheduler;
   private done = false;
   private isError = false;
   private startTime = Date.now();
@@ -99,6 +105,7 @@ export class SubagentExecutionComponent extends Container implements IToolExecut
     this.task = task;
     this.modelId = modelId;
     this.ui = ui;
+    this.displayScheduler = new AdaptiveDisplayScheduler(() => this.rebuild());
     this.collapseOnComplete = options?.collapseOnComplete ?? false;
     this.expandOnComplete = options?.expandOnComplete ?? false;
     this.forked = options?.forked ?? false;
@@ -118,59 +125,88 @@ export class SubagentExecutionComponent extends Container implements IToolExecut
   // ── Mutation API ──────────────────────────────────────────────────────
 
   addToolStart(name: string, args: unknown): void {
-    this.activity.push({ kind: 'tool', name, args, done: false });
+    this.displayScheduler.cancel();
+    this.activity.push({ kind: 'tool', name, args: boundActivityValue(args), done: false });
+    this.trimActivity();
     this.rebuild();
   }
 
   setTask(task: string): void {
+    this.displayScheduler.cancel();
     this.task = task;
     this.rebuild();
   }
 
   setText(text: string): void {
     const nextSnapshot = text.trim();
-    if (!nextSnapshot || nextSnapshot === this.lastTextSnapshot) return;
+    if (!nextSnapshot) return;
+
+    const overlapStart = Math.max(0, this.lastTextSnapshotLength - this.lastTextSnapshot.length);
+    const previousTailMatches =
+      this.lastTextSnapshotLength > 0 &&
+      nextSnapshot.length >= this.lastTextSnapshotLength &&
+      nextSnapshot.slice(overlapStart, this.lastTextSnapshotLength) === this.lastTextSnapshot;
+    if (nextSnapshot.length === this.lastTextSnapshotLength && previousTailMatches) return;
 
     const last = this.activity.at(-1);
-    const extendsPreviousSnapshot = Boolean(this.lastTextSnapshot && nextSnapshot.startsWith(this.lastTextSnapshot));
     let textToRender = nextSnapshot;
-    if (extendsPreviousSnapshot) {
-      const delta = nextSnapshot.slice(this.lastTextSnapshot.length);
+    if (previousTailMatches) {
+      const delta = nextSnapshot.slice(this.lastTextSnapshotLength);
       textToRender = last?.kind === 'text' ? delta : delta.trimStart();
     }
-    this.lastTextSnapshot = nextSnapshot;
+    this.lastTextSnapshotLength = nextSnapshot.length;
+    this.lastTextSnapshot = nextSnapshot.slice(-MAX_RETAINED_ACTIVITY_CHARS);
     if (!textToRender) return;
 
     if (last?.kind === 'text') {
-      last.text = extendsPreviousSnapshot ? `${last.text}${textToRender}` : textToRender;
+      last.text = previousTailMatches ? `${last.text}${textToRender}` : textToRender;
     } else {
       this.activity.push({ kind: 'text', text: textToRender });
     }
-    this.rebuild();
+    this.trimActivity();
+    this.displayScheduler.schedule();
   }
 
   addText(text: string): void {
     this.setText(text);
   }
 
+  appendTextDelta(textDelta: string): void {
+    if (!textDelta) return;
+    const last = this.activity.at(-1);
+    if (last?.kind === 'text') {
+      last.text += textDelta;
+    } else {
+      this.activity.push({ kind: 'text', text: textDelta });
+    }
+    this.trimActivity();
+    this.displayScheduler.schedule();
+  }
+
   addToolEnd(name: string, result: unknown, isError: boolean): void {
+    this.displayScheduler.cancel();
     for (let i = this.activity.length - 1; i >= 0; i--) {
       const item = this.activity[i]!;
       if (item.kind === 'tool' && item.name === name && !item.done) {
         item.done = true;
         item.isError = isError;
-        item.result = typeof result === 'string' ? result : safeStringify(result ?? '');
+        const resultText = typeof result === 'string' ? result : safeStringify(result ?? '');
+        item.result = resultText.slice(-MAX_RETAINED_ACTIVITY_CHARS);
         break;
       }
     }
+    this.trimActivity();
     this.rebuild();
   }
 
   finish(isError: boolean, durationMs: number, result?: string): void {
+    this.displayScheduler.cancel();
     this.done = true;
     this.isError = isError;
     this.durationMs = durationMs;
     this.finalResult = isDuplicateFinalResult(result, this.activity, this.lastTextSnapshot) ? undefined : result;
+    this.lastTextSnapshot = '';
+    this.lastTextSnapshotLength = 0;
     if (this.expandOnComplete) {
       this.expanded = true;
     } else if (this.collapseOnComplete) {
@@ -189,12 +225,61 @@ export class SubagentExecutionComponent extends Container implements IToolExecut
     this.rebuild();
   }
 
+  flushStreamingOutput(): void {
+    this.displayScheduler.flush();
+  }
+
+  dispose(): void {
+    this.displayScheduler.cancel();
+    this.lastTextSnapshot = '';
+    this.lastTextSnapshotLength = 0;
+  }
+
+  getStreamingDiagnostics(): {
+    retainedItems: number;
+    retainedChars: number;
+    pendingUpdate: boolean;
+    scheduledRebuilds: number;
+  } {
+    const diagnostics = this.displayScheduler.diagnostics;
+    return {
+      retainedItems: this.activity.length,
+      retainedChars: this.activity.reduce((total, item) => total + activityCharCount(item), 0),
+      pendingUpdate: diagnostics.pending,
+      scheduledRebuilds: diagnostics.flushCount,
+    };
+  }
+
   // IToolExecutionComponent interface methods
   updateArgs(_args: unknown): void {}
   updateResult(_result: unknown, _isPartial: boolean): void {}
 
   getChatSpacingKind(): ChatSpacingKind {
     return 'normal-tool';
+  }
+
+  private trimActivity(): void {
+    if (this.activity.length > MAX_RETAINED_ACTIVITY_ITEMS) {
+      this.activity.splice(0, this.activity.length - MAX_RETAINED_ACTIVITY_ITEMS);
+    }
+
+    let overflow =
+      this.activity.reduce((total, item) => total + activityCharCount(item), 0) - MAX_RETAINED_ACTIVITY_CHARS;
+    while (overflow > 0 && this.activity.length > 0) {
+      const first = this.activity[0]!;
+      if (first.kind !== 'text') {
+        overflow -= activityCharCount(first);
+        this.activity.shift();
+        continue;
+      }
+      if (first.text.length <= overflow) {
+        overflow -= first.text.length;
+        this.activity.shift();
+        continue;
+      }
+      first.text = first.text.slice(overflow);
+      overflow = 0;
+    }
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────
@@ -320,6 +405,16 @@ export class SubagentExecutionComponent extends Container implements IToolExecut
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+function boundActivityValue(value: unknown): unknown {
+  const text = typeof value === 'string' ? value : safeStringify(value ?? '');
+  return text.length <= MAX_RETAINED_ACTIVITY_CHARS ? value : text.slice(-MAX_RETAINED_ACTIVITY_CHARS);
+}
+
+function activityCharCount(activity: SubagentActivity): number {
+  if (activity.kind === 'text') return activity.text.length;
+  return activity.name.length + safeStringify(activity.args).length + (activity.result?.length ?? 0);
+}
 
 function clampPositiveInt(value: number | undefined, fallback: number): number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback;

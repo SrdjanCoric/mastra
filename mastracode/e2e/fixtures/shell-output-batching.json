@@ -13,7 +13,7 @@
             "id": "call_shell_output_batching",
             "name": "execute_command",
             "arguments": {
-              "command": "node -e \"for(let i=0;i<500;i+=1){process.stdout.write('STREAM_STDOUT_'+i+'\\n');process.stderr.write('STREAM_STDERR_'+i+'\\n')}\"",
+              "command": "node -e \"let i=0;const timer=setInterval(()=>{process.stdout.write('STREAM_STDOUT_'+i+'\\n');process.stderr.write('STREAM_STDERR_'+i+'\\n');i+=1;if(i===40)clearInterval(timer)},75)\"",
               "timeout": 10,
               "cwd": null,
               "tail": 25,

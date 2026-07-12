@@ -1320,19 +1320,47 @@ describe('ToolExecutionComponentEnhanced shell streaming', () => {
       component.appendStreamingOutput(`line ${index}\n`);
     }
 
-    expect(requestRender).not.toHaveBeenCalled();
-    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
-      pendingUpdate: true,
-      scheduledRebuilds: 0,
-    });
-
-    vi.runOnlyPendingTimers();
-
     expect(requestRender).toHaveBeenCalledOnce();
     expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
-      pendingUpdate: false,
+      pendingUpdate: true,
       scheduledRebuilds: 1,
     });
+
+    vi.advanceTimersByTime(100);
+
+    expect(requestRender).toHaveBeenCalledTimes(2);
+    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
+      pendingUpdate: false,
+      scheduledRebuilds: 2,
+    });
+    vi.useRealTimers();
+  });
+
+  it('batches ordinary tool progress after the first visible update', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-12T12:00:00.000Z'));
+    const requestRender = vi.fn();
+    const reconcileBoundaries = vi.fn();
+    const component = new ToolExecutionComponentEnhanced(
+      'mastra_expert',
+      { question: 'Inspect progress' },
+      {},
+      { requestRender } as never,
+      reconcileBoundaries,
+    );
+
+    component.updateResult({ content: [{ type: 'text', text: 'first progress' }], isError: false }, true);
+    component.updateResult({ content: [{ type: 'text', text: 'second progress' }], isError: false }, true);
+
+    expect(requestRender).toHaveBeenCalledOnce();
+    expect(reconcileBoundaries).toHaveBeenCalledOnce();
+    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({ pendingUpdate: true, scheduledRebuilds: 1 });
+
+    vi.advanceTimersByTime(100);
+
+    expect(requestRender).toHaveBeenCalledTimes(2);
+    expect(reconcileBoundaries).toHaveBeenCalledTimes(2);
+    expect(stripAnsi(component.render(100).join('\n'))).toContain('second progress');
     vi.useRealTimers();
   });
 
@@ -1347,6 +1375,7 @@ describe('ToolExecutionComponentEnhanced shell streaming', () => {
     );
 
     component.appendStreamingOutput('last live chunk\n');
+    expect(requestRender).toHaveBeenCalledOnce();
     component.updateResult({ content: [{ type: 'text', text: 'final result\nlast live chunk' }], isError: false });
 
     const visible = stripAnsi(component.render(100).join('\n'));
@@ -1357,7 +1386,7 @@ describe('ToolExecutionComponentEnhanced shell streaming', () => {
     });
 
     vi.runOnlyPendingTimers();
-    expect(requestRender).not.toHaveBeenCalled();
+    expect(requestRender).toHaveBeenCalledOnce();
     vi.useRealTimers();
   });
 

@@ -111,7 +111,6 @@ export function createStaticSubagentComponent(
   ctx.addChildBeforeFollowUps(state.streamingComponent);
 
   reconcileToolBoundaries(ctx);
-  state.ui.requestRender();
   return component;
 }
 
@@ -140,7 +139,6 @@ function handleSubagentProgress(
   }
 
   reconcileToolBoundaries(ctx);
-  state.ui.requestRender();
   return true;
 }
 
@@ -349,6 +347,7 @@ export function handleToolStart(ctx: EventHandlerContext, toolCallId: string, to
         args,
         { showImages: false, collapsedByDefault: !state.toolOutputExpanded },
         state.ui,
+        () => reconcileToolBoundaries(ctx),
       );
       component.setExpanded(state.toolOutputExpanded);
       state.pendingTools.set(toolCallId, component);
@@ -364,6 +363,7 @@ export function handleToolStart(ctx: EventHandlerContext, toolCallId: string, to
       args,
       { showImages: false, collapsedByDefault: !state.toolOutputExpanded },
       state.ui,
+      () => reconcileToolBoundaries(ctx),
     );
     component.setExpanded(state.toolOutputExpanded);
     applyQuietDisplayForNewTool(ctx, component);
@@ -390,13 +390,12 @@ export function handleToolUpdate(ctx: EventHandlerContext, toolCallId: string, p
   const { state } = ctx;
   const component = state.pendingTools.get(toolCallId);
   if (component) {
+    if (component.usesStreamingOutputPreview?.()) return;
     const result: ToolResult = {
       content: [{ type: 'text', text: formatToolResult(partialResult) }],
       isError: false,
     };
     component.updateResult(result, true);
-    reconcileToolBoundaries(ctx);
-    state.ui.requestRender();
   }
 }
 
@@ -413,7 +412,6 @@ export function handleShellOutput(
   const component = state.pendingTools.get(toolCallId);
   if (component?.appendStreamingOutput) {
     component.appendStreamingOutput(output);
-    reconcileToolBoundaries(ctx);
   }
 }
 
@@ -466,6 +464,7 @@ export function handleToolInputStart(ctx: EventHandlerContext, toolCallId: strin
       {},
       { showImages: false, collapsedByDefault: !state.toolOutputExpanded },
       state.ui,
+      () => reconcileToolBoundaries(ctx),
     );
     component.setExpanded(state.toolOutputExpanded);
     state.pendingTools.set(toolCallId, component);
@@ -487,6 +486,7 @@ export function handleToolInputStart(ctx: EventHandlerContext, toolCallId: strin
       {},
       { showImages: false, collapsedByDefault: !state.toolOutputExpanded },
       state.ui,
+      () => reconcileToolBoundaries(ctx),
     );
     component.setExpanded(state.toolOutputExpanded);
     applyQuietDisplayForNewTool(ctx, component);
@@ -578,7 +578,9 @@ export function handleToolInputDelta(ctx: EventHandlerContext, toolCallId: strin
         }
       }
 
-      state.ui.requestRender();
+      if (buffer.toolName === 'ask_user' || buffer.toolName === 'submit_plan' || isTaskMutationTool(buffer.toolName)) {
+        state.ui.requestRender();
+      }
     }
   } catch {
     // Malformed or incomplete JSON — partial-json throws MalformedJSON for invalid input
@@ -602,7 +604,6 @@ export function handleToolEnd(ctx: EventHandlerContext, toolCallId: string, resu
       subagentComponent.finish(isError, 0, resultText);
       state.pendingSubagents.delete(toolCallId);
       pluginSubagentToolCallIds.delete(toolCallId);
-      state.ui.requestRender();
     } else {
       // We'll need to wait for subagent_end to set this
       // Store it temporarily

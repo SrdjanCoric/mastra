@@ -12,6 +12,7 @@ import { highlight } from 'cli-highlight';
 import type { Theme as HighlightTheme } from 'cli-highlight';
 import { MC_TOOLS } from '../../tool-names.js';
 import { BOX_INDENT, getTermWidth, theme, mastra, tintHex, ensureTerminalGlyphContrast } from '../theme.js';
+import { AdaptiveDisplayScheduler } from './adaptive-display-scheduler.js';
 import { truncateAnsi } from './ansi.js';
 import type { ChatSpacingKind } from './chat-spacing.js';
 import { ErrorDisplayComponent } from './error-display.js';
@@ -203,8 +204,8 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     maxChars: MAX_SHELL_PREVIEW_CHARS,
     maxLines: MAX_SHELL_PREVIEW_LINES,
   });
-  private streamingUpdateTimer: ReturnType<typeof setTimeout> | undefined;
-  private scheduledStreamingRebuilds = 0;
+  private readonly displayScheduler: AdaptiveDisplayScheduler;
+  private lastPartialResultSignature = '';
   private completedStreamingFallback = '';
   private quietDisplayMode: QuietToolDisplayMode;
   private quietPreviewLineLimit: number;
@@ -214,11 +215,22 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
   private compactToolGroupLabelColor: CompactToolLabelColor | undefined;
   private compactToolModeColor: string | undefined;
 
-  constructor(toolName: string, args: unknown, options: ToolExecutionOptions = {}, ui: TUI) {
+  constructor(
+    toolName: string,
+    args: unknown,
+    options: ToolExecutionOptions = {},
+    ui: TUI,
+    onDisplayUpdate?: () => void,
+  ) {
     super();
     this.toolName = toolName;
     this.args = args;
     this.ui = ui;
+    this.displayScheduler = new AdaptiveDisplayScheduler(() => {
+      this.rebuild();
+      onDisplayUpdate?.();
+      this.ui.requestRender();
+    });
     this.options = {
       autoCollapse: true,
       collapsedByDefault: true,
@@ -244,19 +256,26 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
   }
 
   refresh(): void {
-    this.rebuild();
+    this.displayScheduler.schedule();
   }
 
   updateResult(result: ToolResult, isPartial = false): void {
-    this.cancelStreamingUpdate();
     this.result = result;
     this.isPartial = isPartial;
-    if (!isPartial) {
-      const finalOutput = this.getFormattedOutput();
-      this.completedStreamingFallback = finalOutput.trim() ? '' : this.streamingOutput.toString();
+    if (isPartial) {
+      const signature = `${result.isError}:${result.content.map(part => part.text ?? part.data ?? '').join('')}`;
+      if (signature === this.lastPartialResultSignature) return;
+      this.lastPartialResultSignature = signature;
+      this.displayScheduler.schedule();
+      return;
     }
+
+    this.displayScheduler.cancel();
+    this.lastPartialResultSignature = '';
+    const finalOutput = this.getFormattedOutput();
+    this.completedStreamingFallback = finalOutput.trim() ? '' : this.streamingOutput.toString();
     this.rebuild();
-    if (!isPartial) this.streamingOutput.clear();
+    this.streamingOutput.clear();
   }
 
   /**
@@ -264,53 +283,43 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
    * Only for execute_command tool - shows live output while command runs.
    */
   appendStreamingOutput(output: string): void {
-    if (
-      this.toolName !== MC_TOOLS.EXECUTE_COMMAND &&
-      this.toolName !== MC_TOOLS.GET_PROCESS_OUTPUT &&
-      this.toolName !== MC_TOOLS.KILL_PROCESS
-    ) {
-      return;
-    }
+    if (!this.usesStreamingOutputPreview() || !output) return;
     this.streamingOutput.setLimits(this.getStreamingPreviewLimits());
     this.streamingOutput.append(output);
-    this.scheduleStreamingUpdate();
+    this.displayScheduler.schedule();
+  }
+
+  usesStreamingOutputPreview(): boolean {
+    return (
+      this.toolName === MC_TOOLS.EXECUTE_COMMAND ||
+      this.toolName === MC_TOOLS.GET_PROCESS_OUTPUT ||
+      this.toolName === MC_TOOLS.KILL_PROCESS
+    );
   }
 
   flushStreamingOutput(): void {
-    if (!this.streamingUpdateTimer) return;
-    this.cancelStreamingUpdate();
-    this.rebuild();
-    this.ui.requestRender();
+    this.displayScheduler.flush();
   }
 
   dispose(): void {
-    this.cancelStreamingUpdate();
+    this.displayScheduler.cancel();
     this.streamingOutput.clear();
+    this.lastPartialResultSignature = '';
   }
 
-  getStreamingPreviewDiagnostics(): { retainedChars: number; pendingUpdate: boolean; scheduledRebuilds: number } {
+  getStreamingPreviewDiagnostics(): {
+    retainedChars: number;
+    retainedLines: number;
+    pendingUpdate: boolean;
+    scheduledRebuilds: number;
+  } {
+    const diagnostics = this.displayScheduler.diagnostics;
     return {
       retainedChars: this.streamingOutput.retainedChars,
-      pendingUpdate: this.streamingUpdateTimer !== undefined,
-      scheduledRebuilds: this.scheduledStreamingRebuilds,
+      retainedLines: this.streamingOutput.retainedLines,
+      pendingUpdate: diagnostics.pending,
+      scheduledRebuilds: diagnostics.flushCount,
     };
-  }
-
-  private scheduleStreamingUpdate(): void {
-    if (this.streamingUpdateTimer) return;
-    this.streamingUpdateTimer = setTimeout(() => {
-      this.streamingUpdateTimer = undefined;
-      this.scheduledStreamingRebuilds += 1;
-      this.rebuild();
-      this.ui.requestRender();
-    }, 16);
-    this.streamingUpdateTimer.unref?.();
-  }
-
-  private cancelStreamingUpdate(): void {
-    if (!this.streamingUpdateTimer) return;
-    clearTimeout(this.streamingUpdateTimer);
-    this.streamingUpdateTimer = undefined;
   }
 
   private getStreamingPreviewLimits(): { maxChars: number; maxLines: number } {
