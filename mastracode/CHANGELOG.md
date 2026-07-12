@@ -1,5 +1,12 @@
 # mastracode-remote
 
+## 0.2.3
+
+### Fixed
+
+- Published archives now contain registry-compatible dependency versions, so global npm installation no longer fails on `workspace:` or `catalog:` references.
+- Release verification now checks and installs the exact archive selected for publication.
+
 ## 0.2.2
 
 ### Documentation
