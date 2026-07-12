@@ -241,7 +241,7 @@ export class TelegramBroker {
     try {
       await this.options.telegram.sendMessage(
         threadId,
-        `MastraCode Telegram verification. Reply in this topic with exactly: ${marker}`,
+        `MastraCode Remote verification. Reply in this topic with exactly: ${marker}`,
       );
     } catch (error) {
       const waiter = this.roundTripWaiters.get(marker);

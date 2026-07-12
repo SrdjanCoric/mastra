@@ -29,7 +29,7 @@ describe('runTelegramCli', () => {
     const startTui = vi.fn().mockResolvedValue(undefined);
 
     await expect(runTelegramCli(['--init', '--help'], { initialize, startTui })).rejects.toThrow(
-      'Usage: mastracode-telegram --init',
+      'Usage: mastracode-remote --init',
     );
     expect(initialize).not.toHaveBeenCalled();
     expect(startTui).not.toHaveBeenCalled();

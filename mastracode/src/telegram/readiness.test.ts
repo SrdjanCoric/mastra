@@ -11,7 +11,7 @@ describe('assertTelegramInitialized', () => {
     const readinessFile = path.join(os.tmpdir(), `missing-mastracode-telegram-${process.pid}`, 'ready.json');
 
     expect(() => assertTelegramInitialized(readinessFile, process.cwd())).toThrow(
-      'Telegram is not initialized. Run `mastracode-telegram --init` from this project first.',
+      'Telegram is not initialized. Run `mastracode-remote --init` from this project first.',
     );
   });
 
@@ -22,7 +22,7 @@ describe('assertTelegramInitialized', () => {
 
     try {
       expect(() => assertTelegramInitialized(readinessFile, process.cwd())).toThrow(
-        'Telegram is not initialized. Run `mastracode-telegram --init` from this project first.',
+        'Telegram is not initialized. Run `mastracode-remote --init` from this project first.',
       );
     } finally {
       fs.rmSync(directory, { recursive: true, force: true });

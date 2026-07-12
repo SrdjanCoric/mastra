@@ -10,7 +10,7 @@ Publish the completed terminal-visible implementation as the next public release
 
 ## AFK tasks
 
-- [ ] Confirm the authenticated account can publish the existing `mastracode-remote` CLI package and access the `mastracode-remote` organization that owns `@mastracode-remote/mastracode-runtime`; verify current dist-tags and the intended next version without reading npm credential files.
+- [ ] Confirm the authenticated account can publish the existing `mastracode-remote` package; verify current dist-tags and the intended next version without reading npm credential files.
 - [ ] Build, test, pack, and inspect the exact release archive. Verify its name, version, executable, README, license, bundled workflow skills, dependency resolution, and exclusion of unrelated monorepo files.
 - [ ] Install the archive into an isolated prefix and temporary home, then smoke-test help, guided init with mocked external seams, visible TUI startup, runtime isolation, and coexistence with the official `mastracode` executable.
 - [ ] Prepare the release notes so existing 0.1.x users are told that this release replaces the headless daemon with a terminal-visible TUI that Telegram controls remotely.

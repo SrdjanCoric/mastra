@@ -39,7 +39,7 @@ export async function prepareGuidedProjectRepository(options: {
   if (/(?:git@github\.com:|https:\/\/github\.com\/)/.test(remotes)) return canonicalPath;
 
   const create = await confirmInitChoice(options.prompter, 'No GitHub remote is configured. Create one now?');
-  if (!create) throw new Error('A GitHub remote is required to initialize MastraCode Telegram.');
+  if (!create) throw new Error('A GitHub remote is required to initialize MastraCode Remote.');
 
   if (!(await optionalCommand(runner, 'gh', ['--version'], canonicalPath))) {
     throw new Error(githubCliInstallInstructions());

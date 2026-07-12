@@ -6,7 +6,12 @@ const packageJsonPath = new URL('../../package.json', import.meta.url);
 type PackageJson = {
   name?: string;
   version?: string;
+  description?: string;
   type?: string;
+  author?: string;
+  repository?: { type?: string; url?: string; directory?: string };
+  homepage?: string;
+  bugs?: { url?: string };
   files?: string[];
   main?: string;
   types?: string;
@@ -27,12 +32,24 @@ describe('mastracode package metadata', () => {
   it('keeps the installed CLI entrypoint and public exports aligned with dist output', async () => {
     const pkg = await readPackageJson();
 
-    expect(pkg.name).toBe('@srdjancoric/mastracode-telegram');
-    expect(pkg.version).toBe('0.1.0');
+    expect(pkg.name).toBe('mastracode-remote');
+    expect(pkg.version).toBe('0.1.3');
+    expect(pkg.description).toBe(
+      'MastraCode with Telegram. Run the normal terminal TUI and continue the same session from Telegram.',
+    );
     expect(pkg.type).toBe('module');
-    expect(pkg.files).toEqual(expect.arrayContaining(['dist', 'CHANGELOG.md']));
-    expect(pkg.bin).toEqual({ 'mastracode-telegram': './dist/telegram-cli.js' });
+    expect(pkg.author).toBe('Srdjan Coric');
+    expect(pkg.repository).toEqual({
+      type: 'git',
+      url: 'git+https://github.com/SrdjanCoric/mastra.git',
+      directory: 'mastracode',
+    });
+    expect(pkg.homepage).toBe('https://github.com/SrdjanCoric/mastra/tree/main/mastracode#readme');
+    expect(pkg.bugs).toEqual({ url: 'https://github.com/SrdjanCoric/mastra/issues' });
+    expect(pkg.files).toEqual(expect.arrayContaining(['dist', '!dist/headless', 'CHANGELOG.md']));
+    expect(pkg.bin).toEqual({ 'mastracode-remote': './dist/telegram-cli.js' });
     expect(pkg.bin).not.toHaveProperty('mastracode');
+    expect(pkg.bin).not.toHaveProperty('mastracode-telegram');
     expect(pkg.main).toBe('dist/index.js');
     expect(pkg.types).toBe('dist/index.d.ts');
     expect(pkg.exports).toMatchObject({
@@ -50,6 +67,7 @@ describe('mastracode package metadata', () => {
       },
       './package.json': './package.json',
     });
+    expect(pkg.exports).not.toHaveProperty('./headless');
     expect(pkg.engines?.node).toBe('>=22.19.0');
   });
 

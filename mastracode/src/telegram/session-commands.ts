@@ -46,7 +46,7 @@ export function formatTelegramStatus(status: TelegramStatusSnapshot): string {
 
 export function formatTelegramHelp(): string {
   return [
-    'MastraCode Telegram commands',
+    'MastraCode Remote commands',
     '/status - show safe session status',
     '/stop - stop active work and clear queued Telegram follow-ups',
     '/help - show this help',

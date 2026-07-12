@@ -67,7 +67,7 @@ export function createTelegramCliHandlers(dependencies: TelegramCliEntryDependen
       write(`Telegram initialized for ${result.projectPath}.`);
       write(`Topic: ${result.threadId}${result.reusedTopic ? ' (reused)' : ' (created)'}`);
       write(`Workflow skills: ${result.skills.length} verified.`);
-      write('Next: run `mastracode-telegram` from this project.');
+      write('Next: run `mastracode-remote` from this project.');
     },
     startTui: async () => {
       const readiness = assertTelegramInitialized(paths.readinessFile, projectPath);

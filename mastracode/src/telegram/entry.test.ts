@@ -16,7 +16,7 @@ describe('createTelegramCliHandlers', () => {
     });
 
     await expect(handlers.startTui()).rejects.toThrow(
-      'Telegram is not initialized. Run `mastracode-telegram --init` from this project first.',
+      'Telegram is not initialized. Run `mastracode-remote --init` from this project first.',
     );
     expect(importStockCli).not.toHaveBeenCalled();
   });
@@ -47,7 +47,7 @@ describe('createTelegramCliHandlers', () => {
 
     expect(initializeProject).toHaveBeenCalledOnce();
     expect(output).toContain('Topic: 42 (created)');
-    expect(output).toContain('Next: run `mastracode-telegram` from this project.');
+    expect(output).toContain('Next: run `mastracode-remote` from this project.');
     expect(output.join('\n')).not.toContain('secret-token');
   });
 

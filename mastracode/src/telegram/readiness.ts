@@ -14,7 +14,7 @@ export interface TelegramReadiness {
   projects: TelegramProjectReadiness[];
 }
 
-const SETUP_GUIDANCE = 'Telegram is not initialized. Run `mastracode-telegram --init` from this project first.';
+const SETUP_GUIDANCE = 'Telegram is not initialized. Run `mastracode-remote --init` from this project first.';
 
 export function assertTelegramInitialized(readinessFile: string, projectPath: string): TelegramProjectReadiness {
   try {

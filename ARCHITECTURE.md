@@ -1,4 +1,4 @@
-# MastraCode Telegram TUI architecture
+# MastraCode Remote architecture
 
 Status: agreed product architecture, updated 2026-07-12.
 

@@ -86,9 +86,7 @@ describe('handleUpdateCommand', () => {
 
     await handleUpdateCommand(ctx);
 
-    expect(ctx.showInfo).toHaveBeenCalledWith(
-      'Updates for this distribution are managed through @srdjancoric/mastracode-telegram.',
-    );
+    expect(ctx.showInfo).toHaveBeenCalledWith('Updates for this distribution are managed through mastracode-remote.');
     expect(fetchLatestVersionMock).not.toHaveBeenCalled();
     expect(ctx.state.chatContainer.addChild).not.toHaveBeenCalled();
   });
