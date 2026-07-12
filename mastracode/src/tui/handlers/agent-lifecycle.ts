@@ -60,7 +60,16 @@ export function handleAgentEnd(ctx: EventHandlerContext): void {
   // causing the new turn's text to visually overwrite the old text + judge.
   state.activeGoalJudge = undefined;
   state.followUpComponents = [];
-  state.pendingTools.clear();
+  for (const component of state.pendingTools?.values() ?? []) {
+    component.flushStreamingOutput?.();
+    component.dispose?.();
+  }
+  for (const component of state.pendingSubagents?.values() ?? []) {
+    component.flushStreamingOutput?.();
+    component.dispose?.();
+  }
+  state.pendingTools?.clear();
+  state.pendingSubagents?.clear();
   state.pendingTaskToolIds?.clear();
   pruneChatContainer(state);
   ctx.updateStatusLine();

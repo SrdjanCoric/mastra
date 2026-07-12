@@ -25,7 +25,9 @@ export const shellOutputBatchingScenario: McE2eScenario = {
     await expect(terminal.getByText(/Project:|Resource ID:|>/gi, { full: true, strict: false })).toBeVisible();
 
     terminal.submit('Run the noisy shell stream.');
-    await runtime.waitForScreenText(/STREAM_STDOUT_499/i, terminal, 30_000);
+    await runtime.waitForScreenText(/STREAM_STDOUT_10/i, terminal, 30_000);
+    expect(terminal.serialize().view).not.toMatch(/Shell stream batching complete\./i);
+    await runtime.waitForScreenText(/STREAM_STDOUT_39/i, terminal, 30_000);
     await runtime.waitForScreenText(/Shell stream batching complete\./i, terminal, 30_000);
 
     terminal.submit('Confirm input still works.');

@@ -77,11 +77,26 @@ const MODE_ID_KEY = 'currentModeId';
 /** Persisted thread-setting key prefix for a mode's last-used model. */
 const modeModelKey = (modeId: string) => `modeModelId_${modeId}`;
 
-const MAX_DISPLAY_SHELL_OUTPUT_CHARS = 65_536;
+const MAX_ACTIVE_DISPLAY_CHARS = 65_536;
+const MAX_ACTIVE_DISPLAY_LINES = 1_000;
+const SHELL_DISPLAY_TOOLS = new Set(['execute_command', 'get_process_output', 'kill_process']);
 
 function appendBoundedDisplayOutput(current: string | undefined, output: string): string {
-  const combined = (current ?? '') + output;
-  return combined.length <= MAX_DISPLAY_SHELL_OUTPUT_CHARS ? combined : combined.slice(-MAX_DISPLAY_SHELL_OUTPUT_CHARS);
+  let retained = (current ?? '') + output;
+  if (retained.length > MAX_ACTIVE_DISPLAY_CHARS) {
+    retained = retained.slice(-MAX_ACTIVE_DISPLAY_CHARS);
+  }
+
+  const allowedNewlines = retained.endsWith('\n') ? MAX_ACTIVE_DISPLAY_LINES : MAX_ACTIVE_DISPLAY_LINES - 1;
+  let newlineCount = 0;
+  for (let index = retained.length - 1; index >= 0; index -= 1) {
+    if (retained.charCodeAt(index) !== 10) continue;
+    newlineCount += 1;
+    if (newlineCount > allowedNewlines) {
+      return retained.slice(index + 1);
+    }
+  }
+  return retained;
 }
 
 /**
@@ -2190,7 +2205,7 @@ export class SessionDisplayState {
       case 'tool_input_delta': {
         const buf = ds.toolInputBuffers.get(event.toolCallId);
         if (buf) {
-          buf.text += event.argsTextDelta;
+          buf.text = appendBoundedDisplayOutput(buf.text, event.argsTextDelta);
         }
         break;
       }
@@ -2230,6 +2245,7 @@ export class SessionDisplayState {
           endedTool.status = event.isError ? 'error' : 'completed';
           endedTool.result = event.result;
           endedTool.isError = event.isError;
+          endedTool.partialResult = undefined;
           endedTool.shellOutput = undefined;
         }
         // Track file modifications
@@ -2257,7 +2273,12 @@ export class SessionDisplayState {
 
       case 'shell_output': {
         const shellTool = ds.activeTools.get(event.toolCallId);
-        if (shellTool && (shellTool.status === 'running' || shellTool.status === 'streaming_input')) {
+        if (
+          shellTool &&
+          SHELL_DISPLAY_TOOLS.has(shellTool.name) &&
+          (shellTool.status === 'running' || shellTool.status === 'streaming_input')
+        ) {
+          shellTool.partialResult = undefined;
           shellTool.shellOutput = appendBoundedDisplayOutput(shellTool.shellOutput, event.output);
         }
         break;
@@ -2300,7 +2321,7 @@ export class SessionDisplayState {
       case 'subagent_text_delta': {
         const sub = ds.activeSubagents.get(event.toolCallId);
         if (sub) {
-          sub.textDelta += event.textDelta;
+          sub.textDelta = appendBoundedDisplayOutput(sub.textDelta, event.textDelta);
         }
         break;
       }
@@ -2309,6 +2330,9 @@ export class SessionDisplayState {
         const subAgent = ds.activeSubagents.get(event.toolCallId);
         if (subAgent) {
           subAgent.toolCalls.push({ name: event.subToolName, isError: false });
+          if (subAgent.toolCalls.length > MAX_ACTIVE_DISPLAY_LINES) {
+            subAgent.toolCalls.splice(0, subAgent.toolCalls.length - MAX_ACTIVE_DISPLAY_LINES);
+          }
         }
         break;
       }
@@ -2330,6 +2354,8 @@ export class SessionDisplayState {
           endedSub.status = event.isError ? 'error' : 'completed';
           endedSub.durationMs = event.durationMs;
           endedSub.result = event.result;
+          endedSub.textDelta = '';
+          endedSub.toolCalls = [];
         }
         break;
       }

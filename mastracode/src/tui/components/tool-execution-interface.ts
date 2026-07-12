@@ -36,6 +36,7 @@ export interface IToolExecutionComponent {
   isComplete?(): boolean;
   /** Append streaming output for shell commands */
   appendStreamingOutput?(output: string): void;
+  usesStreamingOutputPreview?(): boolean;
   flushStreamingOutput?(): void;
   dispose?(): void;
 }

@@ -890,6 +890,19 @@ describe('subagent lifecycle', () => {
     expect(session.displayState.get().activeSubagents.get('s1')!.textDelta).toBe('hello world');
   });
 
+  it('bounds retained subagent text while preserving the latest output', () => {
+    emit(session, { type: 'subagent_start', toolCallId: 's1', agentType: 'explore', task: 't', modelId: 'm' });
+    const oldText = 'a'.repeat(40_000);
+    const latestText = 'b'.repeat(40_000);
+
+    emit(session, { type: 'subagent_text_delta', toolCallId: 's1', agentType: 'explore', textDelta: oldText });
+    emit(session, { type: 'subagent_text_delta', toolCallId: 's1', agentType: 'explore', textDelta: latestText });
+
+    const retained = session.displayState.get().activeSubagents.get('s1')!.textDelta;
+    expect(retained).toHaveLength(65_536);
+    expect(retained.endsWith(latestText)).toBe(true);
+  });
+
   it('tracks subagent tool calls', () => {
     emit(session, { type: 'subagent_start', toolCallId: 's1', agentType: 'explore', task: 't', modelId: 'm' });
     emit(session, {

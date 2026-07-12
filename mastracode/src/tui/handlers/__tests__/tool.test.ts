@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { handleToolInputDelta, handleToolInputStart, handleToolUpdate } from '../tool.js';
 
@@ -32,6 +32,10 @@ function createContext(bufferText: string | undefined) {
 }
 
 describe('tool event handlers', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('parses buffered partial tool args into the pending tool component', () => {
     const { ctx, updateArgs, refresh, requestRender } = createContext('{"path":"src/index.ts","query":"create');
 
@@ -39,7 +43,7 @@ describe('tool event handlers', () => {
 
     expect(updateArgs).toHaveBeenCalledWith({ path: 'src/index.ts', query: 'create' }, false);
     expect(refresh).toHaveBeenCalledOnce();
-    expect(requestRender).toHaveBeenCalledOnce();
+    expect(requestRender).not.toHaveBeenCalled();
   });
 
   it('uses the canonical display-state buffer instead of the latest delta fragment', () => {
@@ -60,6 +64,8 @@ describe('tool event handlers', () => {
   });
 
   it('routes subagent renderer progress into a subagent-style component', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-12T12:00:00.000Z'));
     const component = { updateResult: vi.fn() };
     const requestRender = vi.fn();
     const invalidate = vi.fn();
@@ -111,11 +117,16 @@ describe('tool event handlers', () => {
     expect(component.updateResult).not.toHaveBeenCalled();
     expect(requestRender).toHaveBeenCalled();
 
-    const rendered = ctx.state.chatContainer.children
+    let rendered = ctx.state.chatContainer.children
       .map((child: any) => child.render?.(80)?.join('\n') ?? '')
       .join('\n');
     expect(rendered).toContain('mastra_expert');
     expect(rendered).toContain('search_content');
+    expect(rendered).toContain('Streaming answer text');
+    expect(rendered).not.toContain('Updated answer text');
+
+    vi.advanceTimersByTime(100);
+    rendered = ctx.state.chatContainer.children.map((child: any) => child.render?.(80)?.join('\n') ?? '').join('\n');
     expect(rendered).not.toContain('Streaming answer text');
     expect(rendered).toContain('Updated answer text');
   });

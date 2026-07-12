@@ -30,6 +30,7 @@ import {
   handlePlanApproval,
   handleSubagentStart,
   handleSubagentToolStart,
+  handleSubagentTextDelta,
   handleSubagentToolEnd,
   handleSubagentEnd,
   handleToolApprovalRequired,
@@ -399,8 +400,7 @@ export async function dispatchEvent(
       break;
 
     case 'subagent_text_delta':
-      // Text deltas are streamed but we don't render them incrementally
-      // (the final result is shown via tool_end for the parent tool call)
+      handleSubagentTextDelta(ectx, event.toolCallId, event.textDelta);
       break;
 
     case 'subagent_end':

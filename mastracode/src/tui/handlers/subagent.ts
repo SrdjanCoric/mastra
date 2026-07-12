@@ -36,8 +36,6 @@ export function handleSubagentStart(
   } else {
     insertChatComponentWithBoundarySpacing(state.chatContainer, component);
   }
-
-  state.ui.requestRender();
 }
 
 export function handleSubagentToolStart(
@@ -49,8 +47,11 @@ export function handleSubagentToolStart(
   const component = ctx.state.pendingSubagents.get(toolCallId);
   if (component) {
     component.addToolStart(subToolName, subToolArgs);
-    ctx.state.ui.requestRender();
   }
+}
+
+export function handleSubagentTextDelta(ctx: EventHandlerContext, toolCallId: string, textDelta: string): void {
+  ctx.state.pendingSubagents.get(toolCallId)?.appendTextDelta(textDelta);
 }
 
 export function handleSubagentToolEnd(
@@ -63,7 +64,6 @@ export function handleSubagentToolEnd(
   const component = ctx.state.pendingSubagents.get(toolCallId);
   if (component) {
     component.addToolEnd(subToolName, subToolResult, isError);
-    ctx.state.ui.requestRender();
   }
 }
 
@@ -77,7 +77,7 @@ export function handleSubagentEnd(
   const component = ctx.state.pendingSubagents.get(toolCallId);
   if (component) {
     component.finish(isError, durationMs, result);
+    component.dispose();
     ctx.state.pendingSubagents.delete(toolCallId);
-    ctx.state.ui.requestRender();
   }
 }

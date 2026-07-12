@@ -1,6 +1,6 @@
 import type { TUI } from '@earendil-works/pi-tui';
 import stripAnsi from 'strip-ansi';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SubagentExecutionComponent } from '../subagent-execution.js';
 
 // Minimal mock TUI — only requestRender() is called by SubagentExecutionComponent
@@ -29,6 +29,7 @@ describe('SubagentExecutionComponent', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     Object.defineProperty(process.stdout, 'columns', {
       value: originalColumns,
       writable: true,
@@ -117,6 +118,7 @@ describe('SubagentExecutionComponent', () => {
     comp.addToolStart('find_files', { pattern: '**/CODE_OF_CONDUCT*' });
     comp.addToolEnd('find_files', 'CODE_OF_CONDUCT.md', false);
     comp.setText('First answer draft Final answer after lookup');
+    comp.flushStreamingOutput();
 
     const rendered = renderPlain(comp).join('\n');
 
@@ -151,6 +153,62 @@ describe('SubagentExecutionComponent', () => {
     const rendered = renderPlain(comp).join('\n');
 
     expect(rendered.match(/Final answer after lookup/g)).toHaveLength(1);
+  });
+
+  it('batches intermediate text while rendering the first delta immediately', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-12T12:00:00.000Z'));
+    const requestRender = vi.fn();
+    const comp = new SubagentExecutionComponent('explore', 'Stream findings', { requestRender } as unknown as TUI);
+    requestRender.mockClear();
+
+    comp.appendTextDelta('first ');
+    comp.appendTextDelta('second');
+
+    expect(requestRender).toHaveBeenCalledOnce();
+    expect(comp.getStreamingDiagnostics()).toMatchObject({ pendingUpdate: true, scheduledRebuilds: 1 });
+
+    vi.advanceTimersByTime(100);
+
+    expect(requestRender).toHaveBeenCalledTimes(2);
+    expect(renderPlain(comp).join('\n')).toContain('first second');
+  });
+
+  it('bounds retained subagent text and clears scheduled state on disposal', () => {
+    vi.useFakeTimers();
+    const comp = new SubagentExecutionComponent('explore', 'Stream findings', mockTui);
+
+    for (let index = 0; index < 20_000; index += 1) {
+      comp.appendTextDelta(`finding-${index}\n`);
+    }
+
+    expect(comp.getStreamingDiagnostics()).toMatchObject({ pendingUpdate: true });
+    expect(comp.getStreamingDiagnostics().retainedChars).toBeLessThanOrEqual(65_536);
+
+    comp.flushStreamingOutput();
+    comp.dispose();
+    vi.runOnlyPendingTimers();
+
+    expect(comp.getStreamingDiagnostics()).toMatchObject({ pendingUpdate: false });
+  });
+
+  it('flushes pending text immediately when a subagent tool starts', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-12T12:00:00.000Z'));
+    const requestRender = vi.fn();
+    const comp = new SubagentExecutionComponent('explore', 'Stream findings', { requestRender } as unknown as TUI);
+    requestRender.mockClear();
+
+    comp.setText('first snapshot');
+    comp.setText('first snapshot with pending text');
+    expect(comp.getStreamingDiagnostics().pendingUpdate).toBe(true);
+
+    comp.addToolStart('search_content', { pattern: 'scheduler' });
+
+    expect(comp.getStreamingDiagnostics().pendingUpdate).toBe(false);
+    expect(requestRender).toHaveBeenCalledTimes(2);
+    expect(renderPlain(comp).join('\n')).toContain('pending text');
+    expect(renderPlain(comp).join('\n')).toContain('search_content');
   });
 
   // ─── Default behavior: NO collapse ──────────────────────────────────────
