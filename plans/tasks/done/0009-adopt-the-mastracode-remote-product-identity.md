@@ -35,4 +35,4 @@ Rename the publishable package and command to the established `mastracode-remote
 - Updated setup guidance, runtime messages, package metadata, changesets, architecture text, and the package README. The README documents the visible TUI, Telegram commands, isolated runtime directory, and the legacy 0.1.x boundary.
 - Removed the headless build entry and excluded headless output from the npm archive. Package tests verify the published name, executable, repository metadata, bundled skills, README, and archive contents.
 - Verified 32 focused tests, package typecheck, package lint, the 50-task MastraCode build, and an isolated pack/install smoke test. The smoke test preserved a pre-existing `mastracode` executable and a sentinel under `~/.mastracode-remote/`.
-- Opened PR #10 for the self-contained package identity change.
+- PR #10 merged into `main` at `54b688fba5604b10e5a377fec9fde6534d206715`.
