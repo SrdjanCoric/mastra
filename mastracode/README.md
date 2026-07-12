@@ -67,23 +67,6 @@ mastracode-remote
 
 Use the terminal TUI normally. Messages sent in the project topic enter the same conversation. Telegram messages that arrive during an active run use MastraCode's follow-up queue.
 
-### Keep the TUI running with tmux
-
-Telegram control ends when the TUI closes. To leave it running after you disconnect from a shell, start it inside tmux:
-
-```bash
-tmux new -s mastracode-remote
-mastracode-remote
-```
-
-Detach with `Ctrl-b d` and reconnect with:
-
-```bash
-tmux attach -t mastracode-remote
-```
-
-Exiting MastraCode still ends Telegram control for that project.
-
 ## Telegram commands
 
 | Command   | Behavior                                                                                                                                         |
