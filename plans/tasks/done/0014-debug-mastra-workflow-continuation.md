@@ -33,13 +33,13 @@ The workflow must keep the same safety boundaries. Explicit `stop` still stops i
 
 ## Acceptance criteria
 
-- [ ] The task log records a confirmed, evidence-backed root cause for the repeated workflow stops.
-- [ ] A workflow with unfinished eligible tasks continues after sending a progress response.
-- [ ] An ordinary user message during active work receives a response without cancelling or completing the workflow.
-- [ ] Explicit `stop` ends the workflow, while checkpoints wait and resume without starting a second workflow.
-- [ ] Review, CI, merge, and sync failures remain blocking and cannot be skipped by continuation logic.
-- [ ] A deterministic regression test and a highest-level workflow proof cover the failure and the fix.
-- [ ] Focused tests, type checking, lint, build, and package-scoped MastraCode validation pass.
+- [x] The task log records a confirmed, evidence-backed root cause for the repeated workflow stops.
+- [x] A workflow with unfinished eligible tasks continues after sending a progress response.
+- [x] An ordinary user message during active work receives a response without cancelling or completing the workflow.
+- [x] Explicit `stop` ends the workflow, while checkpoints wait and resume without starting a second workflow.
+- [x] Review, CI, merge, and sync failures remain blocking and cannot be skipped by continuation logic.
+- [x] A deterministic regression test and a highest-level workflow proof cover the failure and the fix.
+- [x] Focused tests, type checking, lint, build, and package-scoped MastraCode validation pass.
 
 ## Implementation log
 
@@ -49,4 +49,5 @@ The workflow must keep the same safety boundaries. Explicit `stop` still stops i
 - Fix: the goal scorer now extracts text from persisted v2 message parts, carries explicit or embedded delivery metadata into the judge prompt, and tells the default judge that answered while-active interjections continue unfinished autonomous work. Explicit stop/pause/cancel requests and goal-required checkpoints still wait.
 - Deterministic proof: `packages/core/src/agent/goal/scorer.test.ts` passes 11/11 cases, including persisted v2 content and embedded delivery metadata. The checked-in `persistent-goal-judge-decision` TUI scenario passes and proves first task → while-active status question → answer → second task → goal done without `/goal resume`.
 - Package proof: `pnpm build:mastracode` completed 50/50 tasks. `pnpm check:mastracode` passed 207/207 unit files and 2098/2098 tests, the package integration slice, active-display performance gate, release configuration verification, and exact publication archive verification.
-- Automatic review: Standards, Spec, and Bug lenses found no blocking or major issues. Security was skipped because the change does not alter authentication, authorization, secrets, network access, subprocesses, or package trust boundaries. Review-mode repository guidelines loaded `00`, `01`, `02`, `05`, `06`, `08`, and `10`; no applicable proof gap remains before CI.
+- Automatic review: Standards, Spec, and Bug lenses found no blocking or major issues. Security was skipped because the change does not alter authentication, authorization, secrets, network access, subprocesses, or package trust boundaries. Review-mode repository guidelines loaded `00`, `01`, `02`, `05`, `06`, `08`, and `10`; no applicable proof gap remained before CI.
+- PR #25 passed CodeQL, dependency review, quality/type checks, tests/performance, package validation, and release-package verification. It merged as `5d316eabbab7a4ed8a7567785c0158c3246c1ae3`.
