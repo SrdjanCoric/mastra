@@ -79,7 +79,7 @@ export const clipboardImagePasteScenario = {
     }
     for (const request of rawRequests) {
       if (!request.body.includes('image/png') || !request.body.includes(TINY_PNG_BASE64)) {
-        throw new Error(`Expected pasted PNG attachment data in raw OpenAI request: ${request.body.slice(0, 2000)}`);
+        throw new Error('Expected pasted PNG attachment data in raw OpenAI request');
       }
       if (request.body.includes('[image]')) {
         throw new Error('Expected editor image placeholder to be removed before raw provider request');

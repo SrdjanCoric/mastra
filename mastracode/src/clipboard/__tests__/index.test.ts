@@ -58,6 +58,9 @@ describe('getClipboardImage', () => {
       expect.arrayContaining(['-s', 'format', 'png', '--out']),
       expect.objectContaining({ stdio: ['pipe', 'pipe', 'pipe'] }),
     );
+    const convertedFiles = mocks.unlinkSync.mock.calls.slice(-2).map(([file]) => String(file));
+    expect(convertedFiles[0]).toMatch(/\.tiff$/);
+    expect(convertedFiles[1]).toMatch(/\.png$/);
   });
 
   it('returns null when direct macOS image coercions all fail', () => {

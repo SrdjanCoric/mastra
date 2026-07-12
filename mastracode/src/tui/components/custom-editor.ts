@@ -485,6 +485,10 @@ export class CustomEditor extends Editor {
       return null;
     }
 
+    if (this.hasUnsupportedImageExtension(normalizedPaste)) {
+      return { error: 'Unsupported image format. Use PNG, JPEG, GIF, or WebP.' };
+    }
+
     const imageUrl = this.normalizePastedImageUrl(normalizedPaste);
     if (imageUrl) {
       const mimeType = this.getImageMimeType(imageUrl);
@@ -501,11 +505,6 @@ export class CustomEditor extends Editor {
     const filePath = this.normalizePastedFilePath(normalizedPaste);
     if (!filePath) {
       return null;
-    }
-
-    const extension = extname(filePath).toLowerCase();
-    if (UNSUPPORTED_IMAGE_EXTENSIONS.has(extension)) {
-      return { error: 'Unsupported image format. Use PNG, JPEG, GIF, or WebP.' };
     }
 
     const mimeType = this.getImageMimeType(filePath);
@@ -570,6 +569,15 @@ export class CustomEditor extends Editor {
     }
 
     return pasteContent;
+  }
+
+  private hasUnsupportedImageExtension(pathOrUrl: string): boolean {
+    try {
+      const extensionSource = /^https?:\/\//i.test(pathOrUrl) ? new URL(pathOrUrl).pathname : pathOrUrl;
+      return UNSUPPORTED_IMAGE_EXTENSIONS.has(extname(extensionSource).toLowerCase());
+    } catch {
+      return false;
+    }
   }
 
   private getImageMimeType(pathOrUrl: string): string | null {
