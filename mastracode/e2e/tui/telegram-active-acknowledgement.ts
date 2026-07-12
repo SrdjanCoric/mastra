@@ -63,7 +63,11 @@ export const telegramActiveAcknowledgementScenario: McE2eScenario = {
     expect(telegramOutput.filter(message => message === receipt)).toHaveLength(1);
 
     await runtime.waitForScreenText(/Active Telegram message answered; normal work continued\./i, terminal, 30_000);
-    expect(telegramOutput).toContain('Active Telegram message answered; normal work continued.');
+    const finalReply = 'Active Telegram message answered; normal work continued.';
+    for (let attempt = 0; attempt < 50 && !telegramOutput.includes(finalReply); attempt += 1) {
+      await runtime.sleep(10);
+    }
+    expect(telegramOutput.filter(message => message === finalReply)).toHaveLength(1);
 
     terminal.keyCtrlC();
   },
