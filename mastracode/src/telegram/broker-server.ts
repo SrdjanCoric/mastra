@@ -21,6 +21,7 @@ export async function startTelegramBrokerServer(options: {
   let closed = false;
   let acceptedClient = false;
   let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
+  const sockets = new Set<net.Socket>();
   let resolveDone: () => void = () => {};
   const done = new Promise<void>(resolve => {
     resolveDone = resolve;
@@ -28,12 +29,14 @@ export async function startTelegramBrokerServer(options: {
 
   const server = net.createServer(socket => {
     acceptedClient = true;
+    sockets.add(socket);
     if (shutdownTimer) {
       clearTimeout(shutdownTimer);
       shutdownTimer = undefined;
     }
     const clientId = randomUUID();
     let registered = false;
+    const pendingDeliveries = new Map<string, { resolve(): void; reject(error: Error): void }>();
     const send = (message: TelegramBrokerServerMessage) => socket.write(encodeBrokerMessage(message));
     const rejectInvalidMessage = () => {
       send({ version: 1, type: 'error', message: 'Invalid Telegram broker message.' });
@@ -59,15 +62,30 @@ export async function startTelegramBrokerServer(options: {
           return;
         }
         try {
-          options.broker.register(clientId, message.registration, delivery => {
-            send({
-              version: 1,
-              type: 'message',
-              text: delivery.text,
-              ...(delivery.replyToMessageId === undefined ? {} : { replyToMessageId: delivery.replyToMessageId }),
-              ...(delivery.promptId === undefined ? {} : { promptId: delivery.promptId }),
-            });
-          });
+          options.broker.register(
+            clientId,
+            message.registration,
+            delivery =>
+              new Promise<void>((resolve, reject) => {
+                const deliveryId = randomUUID();
+                pendingDeliveries.set(deliveryId, { resolve, reject });
+                socket.write(
+                  encodeBrokerMessage({
+                    version: 1,
+                    type: 'message',
+                    deliveryId,
+                    text: delivery.text,
+                    ...(delivery.replyToMessageId === undefined ? {} : { replyToMessageId: delivery.replyToMessageId }),
+                    ...(delivery.promptId === undefined ? {} : { promptId: delivery.promptId }),
+                  }),
+                  error => {
+                    if (!error) return;
+                    pendingDeliveries.delete(deliveryId);
+                    reject(error);
+                  },
+                );
+              }),
+          );
           registered = true;
           send({ version: 1, type: 'registered' });
         } catch (error) {
@@ -98,6 +116,11 @@ export async function startTelegramBrokerServer(options: {
         send({ version: 1, type: 'error', message: 'Register the Telegram project before sending messages.' });
         return;
       }
+      if (message.type === 'ack_delivery') {
+        pendingDeliveries.get(message.deliveryId)?.resolve();
+        pendingDeliveries.delete(message.deliveryId);
+        return;
+      }
       if (message.type === 'send_prompt') {
         void options.broker.sendProjectPrompt(clientId, message.prompt).then(
           result => send({ version: 1, type: 'sent', requestId: message.requestId, messageId: result.messageId }),
@@ -126,6 +149,10 @@ export async function startTelegramBrokerServer(options: {
     }, rejectInvalidMessage);
     socket.on('data', parse);
     socket.on('close', () => {
+      sockets.delete(socket);
+      const error = new Error('Telegram TUI disconnected before acknowledging the delivered instruction.');
+      for (const pending of pendingDeliveries.values()) pending.reject(error);
+      pendingDeliveries.clear();
       options.broker.unregister(clientId);
       if (acceptedClient && options.broker.clientCount === 0 && !closed) {
         shutdownTimer = setTimeout(() => {
@@ -139,6 +166,7 @@ export async function startTelegramBrokerServer(options: {
     if (closed) return;
     closed = true;
     if (shutdownTimer) clearTimeout(shutdownTimer);
+    for (const socket of sockets) socket.destroy();
     await new Promise<void>((resolve, reject) => {
       server.close(error => (error ? reject(error) : resolve()));
     });
@@ -186,6 +214,9 @@ function isTelegramBrokerClientMessage(message: unknown): message is TelegramBro
   }
   if (message.type === 'verify') {
     return typeof message.requestId === 'string' && Number.isSafeInteger(message.threadId);
+  }
+  if (message.type === 'ack_delivery') {
+    return typeof message.deliveryId === 'string';
   }
   return false;
 }

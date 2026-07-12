@@ -2,7 +2,11 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveTelegramBrokerPaths, resolveTelegramRuntimePaths } from './runtime-paths.js';
+import {
+  resolveTelegramBrokerPaths,
+  resolveTelegramProjectLockPath,
+  resolveTelegramRuntimePaths,
+} from './runtime-paths.js';
 
 describe('resolveTelegramRuntimePaths', () => {
   it('keeps all Telegram experiment data under its own runtime root', () => {
@@ -25,6 +29,15 @@ describe('resolveTelegramRuntimePaths', () => {
 
     expect(paths.socketPath).toContain(path.join('.mastracode-telegram', 'runtime', 'broker-'));
     expect(paths.lockPath).toContain(path.join('.mastracode-telegram', 'runtime', 'broker-'));
+    expect(paths.statePath).toContain(path.join('.mastracode-telegram', 'state', 'broker-'));
+    expect(paths.logPath).toContain(path.join('.mastracode-telegram', 'logs', 'broker-'));
     expect(JSON.stringify(paths)).not.toContain('super-secret');
+  });
+
+  it('derives project ownership locks without exposing the project path', () => {
+    const lockPath = resolveTelegramProjectLockPath('/test/home', '/private/projects/top-secret');
+
+    expect(lockPath).toContain(path.join('.mastracode-telegram', 'runtime', 'project-'));
+    expect(lockPath).not.toContain('top-secret');
   });
 });

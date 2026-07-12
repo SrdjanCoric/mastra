@@ -1,5 +1,21 @@
+import { closeSync, rmSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
+
+export interface TelegramProjectLock {
+  release(): void;
+}
+
+export async function acquireTelegramProjectLock(lockPath: string): Promise<TelegramProjectLock | undefined> {
+  const lock = await acquireTelegramBrokerLock(lockPath);
+  if (!lock) return undefined;
+  return {
+    release() {
+      closeSync(lock.fd);
+      rmSync(lockPath, { force: true });
+    },
+  };
+}
 
 export async function acquireTelegramBrokerLock(lockPath: string): Promise<FileHandle | undefined> {
   for (let attempt = 0; attempt < 2; attempt += 1) {

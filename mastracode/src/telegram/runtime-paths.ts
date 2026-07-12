@@ -16,13 +16,20 @@ export interface TelegramRuntimePaths {
 export function resolveTelegramBrokerPaths(
   homeDir: string,
   botToken: string,
-): { socketPath: string; lockPath: string } {
-  const runtimeDir = resolveTelegramRuntimePaths(homeDir).runtimeDir;
+): { socketPath: string; lockPath: string; statePath: string; logPath: string } {
+  const runtimePaths = resolveTelegramRuntimePaths(homeDir);
   const tokenId = createHash('sha256').update(botToken).digest('hex').slice(0, 16);
   return {
-    socketPath: path.join(runtimeDir, `broker-${tokenId}.sock`),
-    lockPath: path.join(runtimeDir, `broker-${tokenId}.lock`),
+    socketPath: path.join(runtimePaths.runtimeDir, `broker-${tokenId}.sock`),
+    lockPath: path.join(runtimePaths.runtimeDir, `broker-${tokenId}.lock`),
+    statePath: path.join(runtimePaths.stateDir, `broker-${tokenId}.json`),
+    logPath: path.join(runtimePaths.logsDir, `broker-${tokenId}.log`),
   };
+}
+
+export function resolveTelegramProjectLockPath(homeDir: string, projectPath: string): string {
+  const projectId = createHash('sha256').update(projectPath).digest('hex').slice(0, 16);
+  return path.join(resolveTelegramRuntimePaths(homeDir).runtimeDir, `project-${projectId}.lock`);
 }
 
 export function resolveTelegramRuntimePaths(homeDir = os.homedir()): TelegramRuntimePaths {

@@ -128,6 +128,7 @@ export type ScenarioName =
   | 'task-patch-tools'
   | 'task-progress-events'
   | 'task-prompt-context-next-turn'
+  | 'telegram-recovery'
   | 'telegram-shared-conversation'
   | 'thread-history'
   | 'tool-history-reload'
