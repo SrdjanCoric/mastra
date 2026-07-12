@@ -73,8 +73,9 @@ export async function initializeTelegramProject(
 
   const repository = await dependencies.inspectRepository(options.projectPath);
   await dependencies.checkGitHub(repository);
+  const canonicalProjectPath = await fs.realpath(options.projectPath);
   const skills = await dependencies.syncSkills(options.homeDir);
-  const topic = await attachProject(paths.stateDir, repository.canonicalPath, telegram);
+  const topic = await attachProject(paths.stateDir, canonicalProjectPath, telegram);
 
   options.onProgress?.('Telegram: reply to the connectivity test message in the new project topic.');
   const brokerPaths = resolveTelegramBrokerPaths(options.homeDir, config.botToken);
@@ -101,14 +102,14 @@ export async function initializeTelegramProject(
   await fs.mkdir(paths.stateDir, { recursive: true });
   const checkedAt = dependencies.now().toISOString();
   await saveReadiness(paths.readinessFile, {
-    projectPath: repository.canonicalPath,
+    projectPath: canonicalProjectPath,
     threadId: topic.project.threadId,
     initialized: true,
     checkedAt,
   });
 
   return {
-    projectPath: repository.canonicalPath,
+    projectPath: canonicalProjectPath,
     threadId: topic.project.threadId,
     reusedTopic: topic.reused,
     recoveredTopic: topic.recovered,

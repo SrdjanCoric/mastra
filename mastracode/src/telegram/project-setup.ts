@@ -18,6 +18,7 @@ export async function prepareGuidedProjectRepository(options: {
 }): Promise<string> {
   if (!options.prompter) return options.projectPath;
   const runner = options.runner ?? run;
+  const canonicalProjectPath = await fs.realpath(options.projectPath);
   let repositoryRoot = await detectRepositoryRoot(options.projectPath, runner);
 
   if (!repositoryRoot) {
@@ -36,7 +37,7 @@ export async function prepareGuidedProjectRepository(options: {
   await ensureGitAuthor(canonicalPath, options.prompter, runner, options.write);
 
   const remotes = await runner('git', ['remote', '-v'], canonicalPath);
-  if (/(?:git@github\.com:|https:\/\/github\.com\/)/.test(remotes)) return canonicalPath;
+  if (/(?:git@github\.com:|https:\/\/github\.com\/)/.test(remotes)) return canonicalProjectPath;
 
   const create = await confirmInitChoice(options.prompter, 'No GitHub remote is configured. Create one now?');
   if (!create) throw new Error('A GitHub remote is required to initialize MastraCode Remote.');
@@ -71,7 +72,7 @@ export async function prepareGuidedProjectRepository(options: {
     canonicalPath,
   );
   options.write(`GitHub: created ${repositoryName} as ${visibility} and configured remote ${remoteName}.`);
-  return canonicalPath;
+  return canonicalProjectPath;
 }
 
 async function ensureGitAuthor(

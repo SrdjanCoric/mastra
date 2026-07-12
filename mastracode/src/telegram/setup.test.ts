@@ -72,6 +72,40 @@ describe('initializeTelegramProject', () => {
     await expect(fs.access(path.join(homeDir, '.mastracode-remote'))).rejects.toThrow();
   });
 
+  it('uses a nested working directory for the topic instead of the parent Git root', async () => {
+    const homeDir = await makeTemporaryDirectory();
+    const repositoryRoot = await makeTemporaryDirectory();
+    const projectPath = path.join(repositoryRoot, 'test-app');
+    await fs.mkdir(projectPath);
+    const canonicalProjectPath = await fs.realpath(projectPath);
+    const createForumTopic = vi.fn().mockResolvedValue({ threadId: 42 });
+    const dependencies = createDependencies({
+      inspectRepository: vi.fn().mockResolvedValue({
+        canonicalPath: await fs.realpath(repositoryRoot),
+        authorName: 'Test User',
+        authorEmail: 'test@example.com',
+        hasGitHubRemote: true,
+      }),
+      createTelegramClient: vi.fn().mockReturnValue({
+        validateAuthorization: vi.fn().mockResolvedValue(undefined),
+        createForumTopic,
+        sendMessage: vi.fn().mockResolvedValue(undefined),
+        verifyRoundTrip: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+
+    const result = await initializeTelegramProject({ homeDir, projectPath, env: telegramEnv, dependencies });
+
+    expect(result.projectPath).toBe(canonicalProjectPath);
+    expect(createForumTopic).toHaveBeenCalledWith('test-app');
+    const registry = JSON.parse(
+      await fs.readFile(path.join(homeDir, '.mastracode-telegram', 'state', 'projects.json'), 'utf8'),
+    );
+    expect(registry.projects).toContainEqual(
+      expect.objectContaining({ projectPath: canonicalProjectPath, displayName: 'test-app', threadId: 42 }),
+    );
+  });
+
   it('does not mutate legacy state, launchd files, external checkouts, or unrelated topics', async () => {
     const homeDir = await makeTemporaryDirectory();
     const projectPath = await makeTemporaryDirectory();
