@@ -41,3 +41,4 @@ The shared TUI and Telegram path already works and is the regression baseline. B
 - Added structured `0600` diagnostics containing only timestamps, event types, IDs/counts, attempts, and safe error codes. Message bodies, prompts, arguments, output, paths, and secrets are not logged.
 - Verified the existing shared-conversation regression baseline and added the checked-in `telegram-recovery` TUI scenario for local operation during an outage and resumed Telegram delivery after recovery.
 - Proof: 16 focused unit/integration files passed with 109 tests; `telegram-shared-conversation` and `telegram-recovery` each passed their checked-in TUI e2e scenario; MastraCode typecheck, lint, and `pnpm build:mastracode` passed.
+- Merged in PR #8 with merge commit `78d2e203f4c4f67712a9689d8fe78503b41366ec`.
