@@ -52,20 +52,22 @@ function extractTextContent(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
-      .map((part: any) => {
-        if (typeof part === 'string') return part;
-        if (typeof part?.text === 'string') return part.text;
-        if (typeof part?.content === 'string') return part.content;
-        return null;
-      })
-      .filter((text: string | null): text is string => Boolean(text))
+      .map(part => extractTextContent(part))
+      .filter(Boolean)
       .join('\n');
   }
-  return String(content ?? '');
+  if (content && typeof content === 'object') {
+    const record = content as Record<string, unknown>;
+    if (typeof record.text === 'string') return record.text;
+    if (record.parts !== undefined) return extractTextContent(record.parts);
+    if (record.content !== undefined) return extractTextContent(record.content);
+  }
+  return '';
 }
 
 function getLatestUserContext(run: { input?: unknown }): {
   lastUserContent: string | null;
+  lastUserDelivery: string | null;
   assistantStepsSinceLastUser: number;
 } {
   const input = run.input as Record<string, unknown> | undefined;
@@ -73,18 +75,41 @@ function getLatestUserContext(run: { input?: unknown }): {
   let lastUserIndex = -1;
 
   for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i] as any;
+    const msg = messages[i] as Record<string, unknown> | undefined;
     if (msg?.role === 'user') {
       lastUserIndex = i;
       break;
     }
   }
 
-  const lastUserContent = lastUserIndex >= 0 ? extractTextContent((messages[lastUserIndex] as any)?.content) : null;
+  const lastUserMessage =
+    lastUserIndex >= 0 ? (messages[lastUserIndex] as Record<string, unknown> | undefined) : undefined;
+  const lastUserContent = lastUserMessage ? extractTextContent(lastUserMessage.content) : null;
+  const attributes =
+    lastUserMessage?.attributes && typeof lastUserMessage.attributes === 'object'
+      ? (lastUserMessage.attributes as Record<string, unknown>)
+      : undefined;
+  const attributeDelivery = typeof attributes?.delivery === 'string' ? attributes.delivery : null;
+  const deliveryMatch = lastUserContent?.match(/<user\b[^>]*\bdelivery=["']([^"']+)["']/i);
+  const lastUserDelivery = attributeDelivery ?? deliveryMatch?.[1] ?? null;
   const assistantStepsSinceLastUser =
-    lastUserIndex >= 0 ? messages.slice(lastUserIndex + 1).filter((msg: any) => msg?.role === 'assistant').length : 0;
+    lastUserIndex >= 0
+      ? messages
+          .slice(lastUserIndex + 1)
+          .filter(msg => (msg as Record<string, unknown> | undefined)?.role === 'assistant').length
+      : 0;
 
-  return { lastUserContent, assistantStepsSinceLastUser };
+  return { lastUserContent, lastUserDelivery, assistantStepsSinceLastUser };
+}
+
+export function buildGoalJudgePrompt(run: { input?: unknown; output?: unknown }): string {
+  const objective = getObjectiveText(run);
+  const output = getOutputText(run);
+  const { lastUserContent, lastUserDelivery, assistantStepsSinceLastUser } = getLatestUserContext(run);
+  const recentUser = lastUserContent
+    ? `\n\nLatest user message:\n${truncateForJudge(lastUserContent)}\n\nLatest user delivery: ${lastUserDelivery ?? 'unspecified'}\n\nAssistant steps since that user message: ${assistantStepsSinceLastUser}`
+    : '';
+  return `Goal: ${objective}${recentUser}\n\nLatest assistant message:\n${output}`;
 }
 
 /**
@@ -142,15 +167,7 @@ export function createGoalScorer({
     .analyze({
       description: 'Judge the latest output against the objective',
       outputSchema: analyzeOutputSchema,
-      createPrompt: ({ run }) => {
-        const objective = getObjectiveText(run);
-        const output = getOutputText(run);
-        const { lastUserContent, assistantStepsSinceLastUser } = getLatestUserContext(run);
-        const recentUser = lastUserContent
-          ? `\n\nLatest user message:\n${truncateForJudge(lastUserContent)}\n\nAssistant steps since that user message: ${assistantStepsSinceLastUser}`
-          : '';
-        return `Goal: ${objective}${recentUser}\n\nLatest assistant message:\n${output}`;
-      },
+      createPrompt: ({ run }) => buildGoalJudgePrompt(run),
     })
     .generateScore(({ results }) => {
       const analysis = results.analyzeStepResult as GoalAnalysis | undefined;

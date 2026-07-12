@@ -4,38 +4,52 @@
       "match": {
         "endpoint": "chat",
         "model": "gpt-5.4-mini",
-        "userMessage": "Drive the persistent goal judge e2e until it is done.",
+        "userMessage": "Status received; autonomous work will continue."
+      },
+      "response": {
+        "content": "{\"decision\":\"continue\",\"reason\":\"Continue autonomous goal work by completing the second workflow task.\"}"
+      }
+    },
+    {
+      "match": {
+        "endpoint": "chat",
+        "model": "gpt-5.4-mini",
+        "userMessage": "Second autonomous workflow task completed."
+      },
+      "response": {
+        "content": "{\"decision\":\"done\",\"reason\":\"Both autonomous workflow tasks are complete.\"}"
+      }
+    },
+    {
+      "match": {
+        "endpoint": "chat",
+        "model": "gpt-5.4-mini",
+        "userMessage": "Complete two autonomous workflow tasks without stopping after a status interjection.",
         "sequenceIndex": 0
       },
       "response": {
-        "content": {
-          "decision": "continue",
-          "reason": "Continue by reporting the goal judge follow-up e2e step."
-        }
+        "content": "First autonomous workflow task completed."
       }
     },
     {
       "match": {
         "endpoint": "chat",
         "model": "gpt-5.4-mini",
-        "userMessage": "Goal attempt 1/3"
-      },
-      "response": {
-        "content": "Goal judge follow-up e2e step completed."
-      }
-    },
-    {
-      "match": {
-        "endpoint": "chat",
-        "model": "gpt-5.4-mini",
-        "userMessage": "Drive the persistent goal judge e2e until it is done.",
+        "userMessage": "Complete two autonomous workflow tasks without stopping after a status interjection.",
         "sequenceIndex": 1
       },
       "response": {
-        "content": {
-          "decision": "done",
-          "reason": "The persistent goal judge e2e objective is complete."
-        }
+        "content": "Second autonomous workflow task completed."
+      }
+    },
+    {
+      "match": {
+        "endpoint": "chat",
+        "model": "gpt-5.4-mini",
+        "userMessage": "What is the current workflow status?"
+      },
+      "response": {
+        "content": "Status received; autonomous work will continue."
       }
     }
   ]

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createMockModel } from '../../test-utils/llm-mock';
 import { createTool } from '../../tools';
 import { DEFAULT_GOAL_JUDGE_PROMPT, GOAL_SCORE_WAITING } from './objective';
-import { createGoalScorer } from './scorer';
+import { buildGoalJudgePrompt, createGoalScorer } from './scorer';
 
 const judgeModel = 'openai/gpt-4o-mini';
 
@@ -59,6 +59,45 @@ describe('createGoalScorer tool support', () => {
     const scorer = createGoalScorer({ judgeModel, prompt: customPrompt, tools: { view: viewTool } });
     const instructions = scorer.config.judge?.instructions ?? '';
     expect(instructions).toBe(customPrompt);
+  });
+});
+
+describe('createGoalScorer active-run interjections', () => {
+  it('tells the judge to answer a while-active status message without parking the goal', () => {
+    const prompt = buildGoalJudgePrompt({
+      input: {
+        originalTask: 'Complete every remaining workflow task.',
+        currentText: 'Task one is merged. I am continuing with task two.',
+        messages: [
+          {
+            role: 'user',
+            content: { format: 2, parts: [{ type: 'text', text: 'Where are we at?' }] },
+            attributes: { delivery: 'while-active' },
+          },
+          { role: 'assistant', content: 'Task one is merged. I am continuing with task two.' },
+        ],
+      },
+      output: 'Task one is merged. I am continuing with task two.',
+    });
+
+    expect(DEFAULT_GOAL_JUDGE_PROMPT).toContain('delivery="while-active"');
+    expect(DEFAULT_GOAL_JUDGE_PROMPT).toContain('continue autonomous goal work');
+    expect(DEFAULT_GOAL_JUDGE_PROMPT).toContain('stop, pause, or cancel');
+    expect(prompt).toContain('Latest user message:\nWhere are we at?');
+    expect(prompt).toContain('Latest user delivery: while-active');
+    expect(prompt).toContain('Assistant steps since that user message: 1');
+  });
+
+  it('retains compatibility with delivery metadata embedded in stored message text', () => {
+    const prompt = buildGoalJudgePrompt({
+      input: {
+        originalTask: 'Complete the workflow.',
+        messages: [{ role: 'user', content: '<user delivery="while-active">Still working?</user>' }],
+      },
+      output: 'Yes. Continuing now.',
+    });
+
+    expect(prompt).toContain('Latest user delivery: while-active');
   });
 });
 
