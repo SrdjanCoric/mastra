@@ -46,9 +46,10 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0010 · Publish MastraCode Remote to npm (after 0007) → tasks/done/0010-publish-mastracode-remote-to-npm.md (PR #12, `7f1ac495`)
 - [x] 0011 · Apply repository guidelines and secure releases → tasks/done/0011-apply-repository-guidelines-and-secure-releases.md (PR #17, `5e36485b`; repair PR #18, `10908151`)
 - [x] 0012 · Reduce active-task CPU and memory use (after 0011) → tasks/done/0012-reduce-active-task-cpu-and-memory.md
-- [ ] 0013 · Simplify Telegram init verification (after 0015) → tasks/0013-simplify-telegram-init-verification.md
+- [x] 0013 · Simplify Telegram init verification (after 0015) → tasks/done/0013-simplify-telegram-init-verification.md
 - [x] 0014 · Debug Mastra workflow continuation (after 0016) → tasks/done/0014-debug-mastra-workflow-continuation.md (PR #25, `5d316eab`)
 - [x] 0015 · Acknowledge every Telegram message (after 0014) → tasks/done/0015-acknowledge-every-telegram-message.md
 - [x] 0016 · Speed up MastraCode Remote CI and prepare 0.2.4 (after 0012) → tasks/done/0016-speed-up-mastracode-remote-ci.md (PR #22, `0fb0ceab`)
 - [x] 0017 · Start managed workflow as a persistent goal (after 0014) → tasks/done/0017-start-managed-workflow-as-a-goal.md
 - [ ] 0019 · Compact edit and search tool output (after 0012) → tasks/0019-compact-edit-and-search-tool-output.md
+- [ ] 0020 · Return while-active replies to Telegram (after 0013) → tasks/0020-return-while-active-replies-to-telegram.md

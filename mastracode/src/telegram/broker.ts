@@ -58,6 +58,10 @@ interface ConnectedProject extends TelegramProjectRegistration {
 const EMPTY_STATE: TelegramBrokerState = { processedUpdateIds: [], unprocessedByThread: {} };
 const MAX_PROCESSED_UPDATE_IDS = 1_000;
 
+function normalizeVerificationReply(text: string): string {
+  return text.trim().toLowerCase();
+}
+
 export class TelegramBroker {
   private readonly projectsByClientId = new Map<string, ConnectedProject>();
   private readonly projectsByPath = new Map<string, ConnectedProject>();
@@ -231,35 +235,38 @@ export class TelegramBroker {
 
   async verifyRoundTrip(threadId: number, timeoutMs = 30_000): Promise<void> {
     const marker = `verify ${randomBytes(3).toString('hex').toUpperCase()}`;
+    const normalizedMarker = normalizeVerificationReply(marker);
     const reply = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        this.roundTripWaiters.delete(marker);
+        this.roundTripWaiters.delete(normalizedMarker);
         reject(new Error('Timed out waiting for the Telegram verification reply.'));
       }, timeoutMs);
-      this.roundTripWaiters.set(marker, { threadId, resolve, reject, timeout });
+      this.roundTripWaiters.set(normalizedMarker, { threadId, resolve, reject, timeout });
     });
     try {
       await this.options.telegram.sendMessage(
         threadId,
-        `MastraCode Remote verification. Reply in this topic with exactly: ${marker}`,
+        'MastraCode Remote verification. Reply in this topic with the code in the next message.',
       );
+      await this.options.telegram.sendMessage(threadId, marker);
     } catch (error) {
-      const waiter = this.roundTripWaiters.get(marker);
+      const waiter = this.roundTripWaiters.get(normalizedMarker);
       if (waiter) {
         clearTimeout(waiter.timeout);
         waiter.reject(error instanceof Error ? error : new Error(String(error)));
       }
-      this.roundTripWaiters.delete(marker);
+      this.roundTripWaiters.delete(normalizedMarker);
     }
     await reply;
   }
 
   async processUpdate(update: TelegramTextUpdate): Promise<UpdateResult> {
     if (update.routable === false || update.userId !== this.options.allowedUserId) return 'ignored';
-    const waiter = this.roundTripWaiters.get(update.text.trim());
+    const normalizedReply = normalizeVerificationReply(update.text);
+    const waiter = this.roundTripWaiters.get(normalizedReply);
     if (waiter?.threadId === update.threadId) {
       clearTimeout(waiter.timeout);
-      this.roundTripWaiters.delete(update.text.trim());
+      this.roundTripWaiters.delete(normalizedReply);
       waiter.resolve();
       return 'ignored';
     }

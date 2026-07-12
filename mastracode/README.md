@@ -144,7 +144,7 @@ Run `mastracode-remote --init` from the same canonical project directory. Initia
 
 ### The connectivity test times out
 
-Confirm that the bot is an administrator in the configured private forum group, can manage topics, and can read messages from the allowed user. Reply to the verification message in the project topic, then rerun initialization.
+Confirm that the bot is an administrator in the configured private forum group, can manage topics, and can read messages from the allowed user. Reply in the project topic with the code from the second verification message, then rerun initialization.
 
 ### Telegram disconnects while the TUI is open
 

@@ -57,8 +57,8 @@ describe('Telegram broker socket', () => {
     const server = await startTelegramBrokerServer({ socketPath, broker, shutdownGraceMs: 5 });
 
     const verification = verifyTelegramRoundTripThroughBroker({ socketPath, threadId: 101 });
-    await waitFor(() => telegram.sendMessage.mock.calls.length === 1);
-    const marker = String(telegram.sendMessage.mock.calls[0]?.[1]).split('exactly: ')[1];
+    await waitFor(() => telegram.sendMessage.mock.calls.length === 2);
+    const marker = String(telegram.sendMessage.mock.calls[1]?.[1]);
     await broker.processUpdate({ updateId: 1, userId: 42, threadId: 101, text: marker });
 
     await expect(verification).resolves.toBeUndefined();
