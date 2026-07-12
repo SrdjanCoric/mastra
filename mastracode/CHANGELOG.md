@@ -1,5 +1,11 @@
 # mastracode-remote
 
+## 0.2.1
+
+### Fixed
+
+- Nested project directories now use their own Telegram topic instead of the enclosing Git repository's topic.
+
 ## 0.2.0
 
 ### Breaking change
