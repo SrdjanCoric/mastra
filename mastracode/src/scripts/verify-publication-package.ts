@@ -65,10 +65,20 @@ async function main(): Promise<void> {
       fs.writeFile(externalSentinel, 'external-checkout\n', 'utf8'),
     ]);
 
-    run('pnpm', ['pack', '--pack-destination', packDir], { cwd: packageDir });
-    const archiveName = (await fs.readdir(packDir)).find(file => file.endsWith('.tgz'));
-    assert(archiveName, 'pnpm pack did not create an archive.');
-    const archivePath = path.join(packDir, archiveName);
+    const suppliedArchive = process.argv.slice(2).find(argument => argument !== '--');
+    let archivePath: string;
+    let archiveName: string;
+    if (suppliedArchive) {
+      archivePath = path.resolve(suppliedArchive);
+      await fs.access(archivePath);
+      archiveName = path.basename(archivePath);
+    } else {
+      run('pnpm', ['pack', '--pack-destination', packDir], { cwd: packageDir });
+      const generatedArchive = (await fs.readdir(packDir)).find(file => file.endsWith('.tgz'));
+      assert(generatedArchive, 'pnpm pack did not create an archive.');
+      archivePath = path.join(packDir, generatedArchive);
+      archiveName = generatedArchive;
+    }
     const archiveBytes = (await fs.stat(archivePath)).size;
     const archiveSha256 = createHash('sha256')
       .update(await fs.readFile(archivePath))
@@ -110,6 +120,9 @@ async function main(): Promise<void> {
       exports?: Record<string, unknown>;
       scripts?: Record<string, string>;
       dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
     };
     assert(packedPackage.name === 'mastracode-remote', 'The packed package name is not mastracode-remote.');
     assert(
@@ -123,6 +136,20 @@ async function main(): Promise<void> {
       !packedPackage.dependencies?.['@mastracode-remote/mastracode-runtime'],
       'The archive still depends on the legacy split runtime.',
     );
+    const dependencyGroups = {
+      dependencies: packedPackage.dependencies ?? {},
+      devDependencies: packedPackage.devDependencies ?? {},
+      optionalDependencies: packedPackage.optionalDependencies ?? {},
+      peerDependencies: packedPackage.peerDependencies ?? {},
+    };
+    for (const [groupName, dependencies] of Object.entries(dependencyGroups)) {
+      for (const [dependencyName, dependencyRange] of Object.entries(dependencies)) {
+        assert(
+          !/^(?:workspace|catalog):/.test(dependencyRange),
+          `The archive contains an unsupported dependency protocol: ${groupName}.${dependencyName}=${dependencyRange}`,
+        );
+      }
+    }
 
     const binDir = process.platform === 'win32' ? prefix : path.join(prefix, 'bin');
     await fs.mkdir(binDir, { recursive: true });

@@ -62,6 +62,9 @@ jobs:
           echo "sha256=$(sha256sum "$archive" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
           echo "bytes=$(stat -c %s "$archive")" >> "$GITHUB_OUTPUT"
 
+      - name: Verify exact release archive
+        run: pnpm --filter ./mastracode verify:publication-package -- "${{ steps.archive.outputs.path }}"
+
       - name: Upload verified archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
