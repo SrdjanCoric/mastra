@@ -39,7 +39,7 @@ export const persistentGoalJudgeDecisionScenario: McE2eScenario = {
     await runtime.waitForScreenText(/Both autonomous workflow tasks are complete/i, terminal, 15_000);
 
     terminal.submit('/goal status');
-    await runtime.waitForScreenText(/Goal \(done\):.*2\/3 turns used/i, terminal, 8_000);
+    await runtime.waitForScreenText(/Goal \(done\):.*2 runs, unlimited/i, terminal, 8_000);
 
     terminal.keyCtrlC();
   },
