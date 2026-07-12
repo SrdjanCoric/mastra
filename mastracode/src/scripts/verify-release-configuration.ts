@@ -30,6 +30,7 @@ async function main(): Promise<void> {
   const jobs = ci.jobs as Record<string, unknown> | undefined;
 
   assert(ciWorkflow.includes('runs-on: ubuntu-latest'), 'MastraCode CI must use a GitHub-hosted runner.');
+  assert(jobs?.changes, 'MastraCode CI must detect whether package checks are required.');
   assert(jobs?.quality, 'MastraCode CI must run quality checks.');
   assert(jobs?.tests, 'MastraCode CI must run tests and performance checks.');
   assert(jobs?.package, 'MastraCode CI must verify the release package.');
@@ -40,7 +41,15 @@ async function main(): Promise<void> {
   assert(ciWorkflow.includes('run: pnpm check:mastracode:package'), 'MastraCode CI must run canonical package checks.');
   assert(ciWorkflow.match(/Restore Turbo build cache/g)?.length === 3, 'Each build job must restore its Turbo cache.');
   assert(ciWorkflow.includes("- 'packages/core/**'"), 'MastraCode CI must run for direct workspace dependencies.');
-  assert(!ciWorkflow.includes("- 'plans/**'"), 'Plan-only changes must not start MastraCode package CI.');
+  assert(ciWorkflow.includes("- 'plans/**'"), 'Plan-only pull requests must receive the required aggregate check.');
+  assert(
+    ciWorkflow.includes('Only plan files changed; package checks are not required.'),
+    'Plan-only changes must bypass expensive package jobs.',
+  );
+  assert(
+    ciWorkflow.includes("grep -qv '^plans/'") && !ciWorkflow.includes("! grep -qv '^plans/'"),
+    'Any non-plan file must enable package checks.',
+  );
   assert(ciWorkflow.includes('github/codeql-action/analyze@'), 'MastraCode CI must include scoped CodeQL analysis.');
   assert(releaseWorkflow.includes('workflow_dispatch:'), 'Releases must require a manual workflow dispatch.');
   assert(

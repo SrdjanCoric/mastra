@@ -10,7 +10,7 @@
 ### Changed
 
 - Split the required MastraCode Remote CI gate into parallel quality, test, package, dependency-review, and CodeQL jobs while preserving one required aggregate result.
-- Removed plan-only changes from the package CI trigger.
+- Let plan-only pull requests satisfy the required check without running package validation jobs.
 
 ## 0.2.3
 

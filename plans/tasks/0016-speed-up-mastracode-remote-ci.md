@@ -49,10 +49,10 @@ PR #20 is the baseline: `Validate package` took 12 minutes 39 seconds. Target a 
 
 - Baseline: PR #20 run `29197728451` took 12m39s. Setup took 1m34s, the serial package check took 9m34s, and CodeQL took 48s.
 - The required gate now runs quality/type checks, tests/performance, package verification, dependency review, and CodeQL in parallel. `Validate package` remains the single branch-protection result.
-- Direct MastraCode workspace dependencies still trigger the workflow. Plan-only changes do not.
+- Direct MastraCode workspace dependencies run the full workflow. Plan-only changes run a lightweight detector and aggregate check, then skip every package job.
 - GitHub run `29200692242` had a 5m8s critical job on the first run. The aggregate check finished two seconds later.
 - GitHub run `29200863258` had a 4m43s critical job on the warm run. Other jobs finished in 2m58s or less, and the aggregate check took four seconds.
 - Local `pnpm check:mastracode` passed with 207 test files and 2,098 tests. The 20,000-chunk display benchmark completed in 150.1ms with two visible rebuilds.
 - `mastracode-remote-0.2.4.tgz` passed isolated install and archive verification. The verified archive was 2,467,410 bytes with SHA-256 `14952d33ab7c92c8bc7ad984141228e64133c577e701af1c2fe0510c4b3ca861`.
 - The README already describes bounded, batched live output and the canonical package commands, so this release does not need a README change.
-- Review: Software Repository Guidelines references `00`, `02`, `05`, `06`, `07`, `08`, and `10` were checked. The review found and fixed two issues before PR: direct runtime dependency paths now trigger CI, and CodeQL alone receives `security-events: write`.
+- Review: Software Repository Guidelines references `00`, `02`, `05`, `06`, `07`, `08`, and `10` were checked. The review fixed direct runtime dependency triggers and limited `security-events: write` to CodeQL. After merge, the required-check path filter was corrected so plan-only PRs get a fast passing aggregate result instead of remaining blocked with an expected check.
