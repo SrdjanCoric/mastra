@@ -702,6 +702,12 @@ export class MastraTUI {
     if (this.state.unsubscribe) {
       this.state.unsubscribe();
     }
+    for (const component of this.state.pendingTools.values()) {
+      component.flushStreamingOutput?.();
+    }
+    for (const component of this.state.allToolComponents) {
+      component.dispose?.();
+    }
     this.state.ui.stop();
   }
 

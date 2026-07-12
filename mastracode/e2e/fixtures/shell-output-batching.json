@@ -1,0 +1,37 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "model": "gpt-5.4-mini",
+        "endpoint": "chat",
+        "userMessage": "Run the noisy shell stream.",
+        "hasToolResult": false
+      },
+      "response": {
+        "toolCalls": [
+          {
+            "id": "call_shell_output_batching",
+            "name": "execute_command",
+            "arguments": {
+              "command": "node -e \"for(let i=0;i<500;i+=1){process.stdout.write('STREAM_STDOUT_'+i+'\\n');process.stderr.write('STREAM_STDERR_'+i+'\\n')}\"",
+              "timeout": 10,
+              "cwd": null,
+              "tail": 25,
+              "background": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "model": "gpt-5.4-mini",
+        "endpoint": "chat",
+        "hasToolResult": true
+      },
+      "response": {
+        "content": "Shell stream batching complete."
+      }
+    }
+  ]
+}

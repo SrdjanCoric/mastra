@@ -275,11 +275,54 @@ describe('tool lifecycle', () => {
   });
 
   describe('shell_output', () => {
-    it('appends shell output to tool', () => {
+    it('appends stdout and stderr in arrival order', () => {
       emit(session, { type: 'tool_start', toolCallId: 't1', toolName: 'execute_command', args: {} });
       emit(session, { type: 'shell_output', toolCallId: 't1', output: 'line1\n', stream: 'stdout' });
       emit(session, { type: 'shell_output', toolCallId: 't1', output: 'line2\n', stream: 'stderr' });
       expect(session.displayState.get().activeTools.get('t1')!.shellOutput).toBe('line1\nline2\n');
+    });
+
+    it('bounds retained display output while the tool is running', () => {
+      emit(session, { type: 'tool_start', toolCallId: 't1', toolName: 'execute_command', args: {} });
+      emit(session, { type: 'shell_output', toolCallId: 't1', output: 'a'.repeat(65_536), stream: 'stdout' });
+      emit(session, {
+        type: 'shell_output',
+        toolCallId: 't1',
+        output: `${'c'.repeat(65_535)}b`,
+        stream: 'stderr',
+      });
+
+      const shellOutput = session.displayState.get().activeTools.get('t1')!.shellOutput;
+      expect(shellOutput).toHaveLength(65_536);
+      expect(shellOutput).toBe(`${'c'.repeat(65_535)}b`);
+    });
+
+    it('releases duplicate shell output when the tool completes', () => {
+      emit(session, { type: 'tool_start', toolCallId: 't1', toolName: 'execute_command', args: {} });
+      emit(session, { type: 'shell_output', toolCallId: 't1', output: 'live output\n', stream: 'stdout' });
+      emit(session, { type: 'tool_end', toolCallId: 't1', result: 'live output', isError: false });
+
+      expect(session.displayState.get().activeTools.get('t1')!.shellOutput).toBeUndefined();
+    });
+
+    it('releases duplicate shell output when the tool fails', () => {
+      emit(session, { type: 'tool_start', toolCallId: 't1', toolName: 'execute_command', args: {} });
+      emit(session, { type: 'shell_output', toolCallId: 't1', output: 'failure output\n', stream: 'stderr' });
+      emit(session, { type: 'tool_end', toolCallId: 't1', result: 'failure output', isError: true });
+
+      const tool = session.displayState.get().activeTools.get('t1')!;
+      expect(tool.status).toBe('error');
+      expect(tool.shellOutput).toBeUndefined();
+    });
+
+    it('releases duplicate shell output when the run is aborted', () => {
+      emit(session, { type: 'tool_start', toolCallId: 't1', toolName: 'execute_command', args: {} });
+      emit(session, { type: 'shell_output', toolCallId: 't1', output: 'before abort\n', stream: 'stderr' });
+      emit(session, { type: 'agent_end', reason: 'aborted' });
+
+      const tool = session.displayState.get().activeTools.get('t1')!;
+      expect(tool.status).toBe('error');
+      expect(tool.shellOutput).toBeUndefined();
     });
   });
 

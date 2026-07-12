@@ -1,6 +1,6 @@
 import { visibleWidth } from '@earendil-works/pi-tui';
 import chalk from 'chalk';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { theme, tintHex, ensureTerminalGlyphContrast } from '../../theme.js';
 import { ToolExecutionComponentEnhanced, parseErrorFromContent } from '../tool-execution-enhanced.js';
 
@@ -1302,5 +1302,98 @@ describe('parseErrorFromContent', () => {
       parseErrorFromContent(input);
       expect(performance.now() - start).toBeLessThan(budget);
     }
+  });
+});
+
+describe('ToolExecutionComponentEnhanced shell streaming', () => {
+  it('coalesces rapid chunks into one scheduled component update', () => {
+    vi.useFakeTimers();
+    const requestRender = vi.fn();
+    const component = new ToolExecutionComponentEnhanced(
+      'execute_command',
+      { command: 'stream output', tail: 20 },
+      {},
+      { requestRender } as never,
+    );
+
+    for (let index = 0; index < 1_000; index += 1) {
+      component.appendStreamingOutput(`line ${index}\n`);
+    }
+
+    expect(requestRender).not.toHaveBeenCalled();
+    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
+      pendingUpdate: true,
+      scheduledRebuilds: 0,
+    });
+
+    vi.runOnlyPendingTimers();
+
+    expect(requestRender).toHaveBeenCalledOnce();
+    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
+      pendingUpdate: false,
+      scheduledRebuilds: 1,
+    });
+    vi.useRealTimers();
+  });
+
+  it('flushes the last chunk and releases raw streaming state on completion', () => {
+    vi.useFakeTimers();
+    const requestRender = vi.fn();
+    const component = new ToolExecutionComponentEnhanced(
+      'execute_command',
+      { command: 'stream output', tail: 20 },
+      {},
+      { requestRender } as never,
+    );
+
+    component.appendStreamingOutput('last live chunk\n');
+    component.updateResult({ content: [{ type: 'text', text: 'final result\nlast live chunk' }], isError: false });
+
+    const visible = stripAnsi(component.render(100).join('\n'));
+    expect(visible).toContain('last live chunk');
+    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
+      retainedChars: 0,
+      pendingUpdate: false,
+    });
+
+    vi.runOnlyPendingTimers();
+    expect(requestRender).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('keeps the final streamed chunk visible when a failed command has no final text', () => {
+    vi.useFakeTimers();
+    const component = new ToolExecutionComponentEnhanced('execute_command', { command: 'failing stream' }, {}, {
+      requestRender() {},
+    } as never);
+
+    component.appendStreamingOutput('failure before exit\n');
+    component.updateResult({ content: [{ type: 'text', text: '' }], isError: true });
+
+    expect(stripAnsi(component.render(100).join('\n'))).toContain('failure before exit');
+    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
+      retainedChars: 0,
+      pendingUpdate: false,
+    });
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  it('flushes pending output before disposal without leaving a timer or raw buffer', () => {
+    vi.useFakeTimers();
+    const component = new ToolExecutionComponentEnhanced('execute_command', { command: 'stream output' }, {}, {
+      requestRender() {},
+    } as never);
+
+    component.appendStreamingOutput('output before shutdown\n');
+    component.flushStreamingOutput();
+    component.dispose();
+
+    expect(stripAnsi(component.render(100).join('\n'))).toContain('output before shutdown');
+    expect(component.getStreamingPreviewDiagnostics()).toMatchObject({
+      retainedChars: 0,
+      pendingUpdate: false,
+    });
+    vi.useRealTimers();
   });
 });
