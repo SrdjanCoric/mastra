@@ -13,10 +13,9 @@ The project has one master plan, usually named from `AGENTS.md` or `CLAUDE.md` a
 
 - `[ ]` — todo, unclaimed.
 - `[~]` — claimed/in progress.
-- `[>]` — implementation and PR are done, awaiting merge/sync closeout.
-- `[x]` — merged to `main`; task file has moved to `plans/tasks/done/`.
+- `[x]` — completed in its implementation PR; on `main`, this means merged and the task file is under `plans/tasks/done/`.
 
-A pointer may carry `(after NNNN, ...)`. A task is eligible only when it is `[ ]` and every listed dependency is `[x]`. `[>]` does not unblock dependents because the code is not confirmed on local `main` until `mastra-sync-main` closes it out.
+A pointer may carry `(after NNNN, ...)`. A task is eligible only when it is `[ ]` and every listed dependency is `[x]` on the current `main`. The implementation branch may carry its own `[x]` closeout before merge, but it does not unblock another task because the workflow syncs `main` before selecting the next task.
 
 ## Human checkpoint policy
 
@@ -33,7 +32,7 @@ Before asking, investigate. If an item can be proven by tests, typecheck, build,
 
 ### 1. Select and claim
 
-Read the master plan directly. Select the first eligible `[ ]` pointer, or the requested ordinal/path if it is eligible. If no task is eligible, report why: complete, blocked by dependencies, or waiting for prior `[>]` sync.
+Read the master plan directly. Select the first eligible `[ ]` pointer, or the requested ordinal/path if it is eligible. If no task is eligible, report why: complete, blocked by dependencies, or waiting for the current `[~]` task PR to merge and sync.
 
 Immediately flip the selected pointer `[ ]→[~]` before doing implementation work. This is the concurrency marker. No git worktree flow is used.
 
@@ -107,19 +106,24 @@ Update the task file with:
 - README decision,
 - any human checkpoint answers.
 
-Do not mark the task `[x]` here.
+Then close the task on the implementation branch before opening its PR:
+
+1. Flip its master-plan pointer `[~]→[x]`.
+2. Move the task file from `plans/tasks/` to `plans/tasks/done/`.
+3. Update the plan link to the done path.
+4. Confirm no active task-file copy remains.
+
+This closeout is provisional on the feature branch and becomes authoritative only when the implementation PR merges to `main`. Do not create a later closeout-only commit or PR. The PR number and merge SHA are available from GitHub and git history; they do not require a post-merge plan edit.
 
 ### 8. Create and merge PR
 
-Invoke `mastra-create-pr` to commit, push, open the PR, wait for required checks, recover safe CI failures, and merge on the happy path. The master workflow is AFK by default; do not ask for PR approval unless repo policy, credentials, branch protection, security, or ambiguity requires a human.
+Invoke `mastra-create-pr` to commit the implementation and its plan closeout together, push, open the PR, wait for required checks, recover safe CI failures, and merge on the happy path. The master workflow is AFK by default; do not ask for PR approval unless repo policy, credentials, branch protection, security, or ambiguity requires a human.
 
-After the PR exists and corresponds to this task branch, flip `[~]→[>]`. `mastra-create-pr` then owns waiting for checks and merging the PR.
+### 9. Sync main and verify closeout
 
-### 9. Sync main and close out
+After `mastra-create-pr` reports the PR merged, invoke `mastra-sync-main`. It checks out `main`, pulls the merge, confirms the merged implementation PR contains the `[x]` pointer and task file under `plans/tasks/done/`, and cleans safe merged branches. It must not create another closeout commit or PR.
 
-After `mastra-create-pr` reports the PR merged, invoke `mastra-sync-main`. It checks out `main`, pulls the merge, confirms the merge landed locally, cleans safe merged branches, flips `[>]→[x]`, moves the task file to `plans/tasks/done/`, and records the merge closeout. No git worktree cleanup is involved.
-
-Return to `mastra-workflow` only after this selected task is closed out or after a live Telegram checkpoint is waiting.
+Return to `mastra-workflow` only after the selected task is merged, synced, and verified closed, or after a live Telegram checkpoint is waiting.
 
 ## Rules
 

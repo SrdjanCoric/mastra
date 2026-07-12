@@ -1,6 +1,6 @@
 ---
 name: mastra-workflow
-description: End-to-end Mastra autopilot loop — mastra-talk-it-through → mastra-software-repository-guidelines → mastra-to-plan → loop { mastra-implement-next-task → mastra-task-review → mastra-create-pr → mastra-sync-main } → final repository-guidelines assessment. Runs until every task and applicable repository guideline is complete or the user explicitly stops it. Pass --run to skip interview and planning. Checkpoints wait/resume through Telegram rather than ending the workflow.
+description: End-to-end Mastra autopilot loop — mastra-talk-it-through → mastra-software-repository-guidelines → mastra-to-plan → loop { mastra-implement-next-task → mastra-task-review → one implementation-and-closeout PR → mastra-sync-main } → final repository-guidelines assessment. Runs until every task and applicable repository guideline is complete or the user explicitly stops it. Pass --run to skip interview and planning. Checkpoints wait/resume through Telegram rather than ending the workflow.
 ---
 
 # Mastra Workflow
@@ -23,9 +23,8 @@ similarly named generic skills, such as `task-review`, `implement-next-task`, or
 - **`mastra-task-review`** is invoked by `mastra-implement-next-task` as its automatic review-only gate.
 - **`mastra-diagnose`** is invoked by `mastra-implement-next-task` if two automatic review/fix retries still leave blocker/major findings.
 - **`mastra-handoff`** is invoked before `mastra-diagnose` when the unresolved review failure needs a focused fresh context package.
-- **`mastra-create-pr`** is invoked by `mastra-implement-next-task` to open, verify, and merge the PR.
-- **`mastra-sync-main`** is invoked by `mastra-implement-next-task` after merge to update local `main` and
-  close the completed task in the master plan.
+- **`mastra-create-pr`** is invoked by `mastra-implement-next-task` to open, verify, and merge the single PR containing both implementation and task closeout.
+- **`mastra-sync-main`** is invoked by `mastra-implement-next-task` after merge to update local `main`, verify the closeout landed, and clean safe branches without another commit or PR.
 
 If a required `mastra-*` skill is unavailable, do not fall back to a generic equivalent. Try to
 repair or reload the skill. If that cannot be done safely, send the exact missing-skill problem
@@ -86,10 +85,11 @@ input and then resume the same iteration (see **Recovery and escalation** below)
 
 ```
 while there is an eligible pointer in the master plan:
-    mastra-implement-next-task       # build, review, open+merge PR, sync main, close task
+    mastra-implement-next-task       # build, review, close task in branch, open+merge one PR, sync main
     #   ├─ internally invokes mastra-task-review (review-only gate)
-    #   ├─ internally invokes mastra-create-pr (opens, waits checks, merges PR)
-    #   └─ internally invokes mastra-sync-main (pulls main, flips [>]→[x], moves file)
+    #   ├─ closes the plan pointer and moves the task file before PR creation
+    #   ├─ internally invokes mastra-create-pr (opens, waits checks, merges implementation+closeout)
+    #   └─ internally invokes mastra-sync-main (pulls main, verifies closeout, cleans branch)
 ```
 
 `mastra-implement-next-task` already chains through `mastra-task-review`, `mastra-create-pr`, and
@@ -107,8 +107,8 @@ again** after each iteration returns, until no eligible pointer remains.
    item may the workflow report **"plan complete"**.
 4. If at least one pointer is `[ ]` and its `(after …)` deps are all `[x]` → run
    `mastra-implement-next-task` again for the next iteration.
-5. If no `[ ]` pointer is eligible but some remain (for example, an unmerged `[>]` while CI is
-   still running), inspect and recover the incomplete prior iteration. Wait for CI, retry the
+5. If no `[ ]` pointer is eligible but some remain (for example, the current task PR is still in
+   CI or awaiting merge), inspect and recover the incomplete prior iteration. Wait for CI, retry the
    responsible sub-skill, or ask the user through the available input tool and wait for their
    Telegram reply. Do not end the workflow because the plan is temporarily blocked or because a
    checkpoint is waiting for the user.
@@ -131,17 +131,17 @@ Telegram reply, and continue instead of returning.
 - Iteration closeout: the task selected at the start of the iteration is `[x]` after the iteration,
   points to `tasks/done/...`, and has its task file under `plans/tasks/done/`.
 - Task file completeness: the done task file has checked AFK items, checked acceptance criteria, an
-  implementation log, verification commands/results, review result, README decision, PR number, and
-  merge SHA.
+  implementation log, verification commands/results, review result, and README decision. PR identity
+  and merge SHA remain available from GitHub and git history without a post-merge plan edit.
 - README handling: if the task changed user-facing behavior, setup, commands, configuration, or the
   project story, `mastra-write-well` was loaded and `README.md` was updated before PR. If not, the
   task log records that no README change was needed.
 - PR/CI/merge: the PR exists, required CI passed, and the PR is merged into `main`; the task branch
   was deleted or any leftover branch is reported.
-- Sync-main result: `mastra-sync-main` ran after merge. If the task is still `[~]` or `[>]`, do not
-  continue to the next task; rerun or repair sync-main until it is `[x]`, asking through Telegram
-  only when user action is genuinely required.
-- Plan sanity: no `[x]` pointer links to `plans/tasks/`, no `[ ]`/`[~]`/`[>]` pointer links to
+- Sync-main result: `mastra-sync-main` ran after merge and verified that the implementation PR carried
+  the `[x]` pointer and done task file onto `main`. If it did not, return to the failed iteration rather
+  than creating a closeout-only PR.
+- Plan sanity: no `[x]` pointer links to `plans/tasks/`, no `[ ]`/`[~]` pointer links to
   `plans/tasks/done/`, and every next eligible `[ ]` pointer has all `(after …)` dependencies `[x]`.
 - Escalation reporting: on any human/security/CI/merge escalation, include the current pointer state,
   PR URL if any, branch name, and exact command/result, then wait for the reply and resume.
