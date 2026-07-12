@@ -8,6 +8,19 @@ import { createTelegramCliHandlers } from './entry.js';
 import { resolveTelegramRuntimePaths } from './runtime-paths.js';
 
 describe('createTelegramCliHandlers', () => {
+  it('prints package help without reading Telegram readiness', () => {
+    const output: string[] = [];
+    const handlers = createTelegramCliHandlers({
+      homeDir: `/tmp/missing-mastracode-telegram-${process.pid}`,
+      write: message => output.push(message),
+    });
+
+    handlers.showHelp();
+
+    expect(output).toContain('MastraCode Remote');
+    expect(output).toContain('  mastracode-remote --init   Initialize Telegram for the current project');
+  });
+
   it('refuses to start the TUI before isolated Telegram setup is ready', async () => {
     const importStockCli = vi.fn().mockResolvedValue(undefined);
     const handlers = createTelegramCliHandlers({

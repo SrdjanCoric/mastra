@@ -60,7 +60,6 @@ async function main(): Promise<void> {
     const archiveFiles = run('tar', ['-tzf', archivePath]).split('\n');
     assert(archiveFiles.includes('package/README.md'), 'The archive is missing README.md.');
     assert(archiveFiles.includes('package/LICENSE.md'), 'The archive is missing LICENSE.md.');
-    assert(archiveFiles.includes('package/SECURITY.md'), 'The archive is missing SECURITY.md.');
     assert(archiveFiles.includes('package/dist/telegram-cli.js'), 'The archive is missing the CLI entrypoint.');
     assert(
       archiveFiles.some(file => file.startsWith('package/assets/skills/mastra-workflow/')),
@@ -111,6 +110,9 @@ async function main(): Promise<void> {
       USERPROFILE: home,
       PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ''}`,
     };
+    const help = run(remoteBin, ['--help'], { cwd: project, env: isolatedEnv });
+    assert(help.includes('mastracode-remote --init'), 'The installed executable did not print package help.');
+
     const startup = spawnSync(remoteBin, [], { cwd: project, env: isolatedEnv, encoding: 'utf8' });
     assert(startup.status !== 0, 'An uninitialized package run should stop before starting the TUI.');
     assert(

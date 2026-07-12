@@ -1,4 +1,25 @@
-# mastracode
+# mastracode-remote
+
+## 0.2.0
+
+### Breaking change
+
+This release replaces the 0.1.x headless daemon and launchd workflow with the visible MastraCode terminal TUI. Telegram connects to that same live session. Closing the TUI ends Telegram control.
+
+Existing 0.1.x installations are not migrated automatically. Remove the old service with `mastracode-remote service uninstall`, install this release, and run `mastracode-remote --init` in each project.
+
+### Added
+
+- Guided Telegram project initialization with reusable forum topics, credential checks, Git and GitHub setup choices, and managed workflow skills.
+- Shared TUI and Telegram conversations, follow-up queueing, `/status`, `/stop`, `/help`, questions, and approvals.
+- Broker reconnection, duplicate protection, persisted offsets, missing-topic guidance, and isolated runtime state under `~/.mastracode-telegram/`.
+- Package verification, operator documentation, license information, and updated managed skills.
+
+### Fixed
+
+- Bounded and batched noisy shell output so long-running terminal sessions remain responsive.
+- Duplicate Telegram message rendering and misleading Telegram startup notices.
+- `mastracode-remote --help` now works before project initialization.
 
 ## 0.30.0
 

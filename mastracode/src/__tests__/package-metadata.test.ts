@@ -34,7 +34,7 @@ describe('mastracode package metadata', () => {
     const pkg = await readPackageJson();
 
     expect(pkg.name).toBe('mastracode-remote');
-    expect(pkg.version).toBe('0.1.3');
+    expect(pkg.version).toBe('0.2.0');
     expect(pkg.description).toBe(
       'MastraCode with Telegram. Run the normal terminal TUI and continue the same session from Telegram.',
     );
@@ -47,9 +47,7 @@ describe('mastracode package metadata', () => {
     });
     expect(pkg.homepage).toBe('https://github.com/SrdjanCoric/mastra/tree/main/mastracode#readme');
     expect(pkg.bugs).toEqual({ url: 'https://github.com/SrdjanCoric/mastra/issues' });
-    expect(pkg.files).toEqual(
-      expect.arrayContaining(['dist', '!dist/headless', 'CHANGELOG.md', 'LICENSE.md', 'SECURITY.md']),
-    );
+    expect(pkg.files).toEqual(expect.arrayContaining(['dist', '!dist/headless', 'CHANGELOG.md', 'LICENSE.md']));
     expect(pkg.bin).toEqual({ 'mastracode-remote': './dist/telegram-cli.js' });
     expect(pkg.bin).not.toHaveProperty('mastracode');
     expect(pkg.bin).not.toHaveProperty('mastracode-telegram');

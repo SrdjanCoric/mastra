@@ -108,8 +108,6 @@ Telegram receives completed assistant messages, lifecycle notices, and redacted 
 
 Anyone who can read the Telegram group can read messages posted there. Use a private group, restrict its membership, protect the Telegram account with two-step verification, and rotate the bot token if it is exposed.
 
-Report vulnerabilities privately using the process in [`SECURITY.md`](./SECURITY.md). Never include bot tokens, private Telegram identifiers, message content, or exploit details in a public issue.
-
 ## Runtime data and 0.1.x compatibility
 
 This TUI-backed version stores Telegram data under a separate runtime root:
