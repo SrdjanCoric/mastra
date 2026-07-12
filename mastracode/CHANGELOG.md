@@ -1,5 +1,19 @@
 # mastracode-remote
 
+## 0.2.5
+
+### Fixed
+
+- Started `mastra workflow` and `mastra workflow --run` as persistent, unlimited goals. Telegram and terminal interjections no longer stop the workflow or consume a goal run.
+- Sent receipts and completed replies for Telegram messages back to the project topic without forwarding terminal-only replies.
+- Split Telegram setup verification into separate prompt and code messages, with case-insensitive verification replies.
+- Converted macOS TIFF clipboard images to PNG and rejected unreadable or unsupported terminal images before starting a model turn.
+
+### Changed
+
+- Replaced partial source previews for file edits, searches, and discovery with compact path, pattern, line-range, and result-count summaries.
+- Preserved unlimited managed-workflow state in model context, persisted thread state, status output, and live goal cards.
+
 ## 0.2.4
 
 ### Fixed
