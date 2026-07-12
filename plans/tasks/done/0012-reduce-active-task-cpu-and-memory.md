@@ -92,3 +92,5 @@ No README change was needed. The package README already states that live command
 ### Review
 
 Automatic task review completed against `main` with the Standards, Spec, and Bug lenses. The Security lens was skipped because the diff changes display scheduling, bounded display state, tests, and package commands without changing a trust boundary. No blocker, major, minor, or nit findings remained. The review independently loaded `00-overview.md`, `01-style-and-code-quality.md`, `02-testing.md`, `05-ci-cd.md`, `06-code-health-and-maintainability.md`, `08-recommended-canonical-commands.md`, and `10-definition-of-done.md`; the recorded unit, integration, performance, build, lint, formatting, and typecheck proof covered the applicable items.
+
+PR #20 merged at `0808ee84be6a960965fd52fafc167b0603912e08` after `Validate package` and CodeQL passed.
