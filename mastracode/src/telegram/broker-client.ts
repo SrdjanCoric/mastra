@@ -45,10 +45,12 @@ export async function verifyTelegramRoundTripThroughBroker(options: {
 export async function connectTelegramBrokerClient(options: {
   socketPath: string;
   registration: TelegramProjectRegistration;
-  onMessage(message: TelegramBrokerIncomingMessage): void;
+  onMessage(message: TelegramBrokerIncomingMessage): Promise<void> | void;
   onError?(error: Error): void;
+  onDisconnect?(): void;
 }): Promise<TelegramBrokerClient> {
   const socket = net.createConnection(options.socketPath);
+  let intentionallyClosed = false;
   let resolveRegistered: () => void = () => {};
   let rejectRegistered: (error: Error) => void = () => {};
   const registered = new Promise<void>((resolve, reject) => {
@@ -72,11 +74,21 @@ export async function connectTelegramBrokerClient(options: {
       if (message.type === 'registered') {
         resolveRegistered();
       } else if (message.type === 'message') {
-        options.onMessage({
-          text: message.text,
-          ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
-          ...(message.promptId === undefined ? {} : { promptId: message.promptId }),
-        });
+        void Promise.resolve(
+          options.onMessage({
+            text: message.text,
+            ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
+            ...(message.promptId === undefined ? {} : { promptId: message.promptId }),
+          }),
+        ).then(
+          () => {
+            socket.write(encodeBrokerMessage({ version: 1, type: 'ack_delivery', deliveryId: message.deliveryId }));
+          },
+          error => {
+            options.onError?.(error instanceof Error ? error : new Error(String(error)));
+            socket.destroy();
+          },
+        );
       } else if (message.type === 'sent') {
         pendingSends.get(message.requestId)?.resolve(message.messageId);
         pendingSends.delete(message.requestId);
@@ -110,6 +122,7 @@ export async function connectTelegramBrokerClient(options: {
     const error = new Error('Telegram broker connection closed.');
     for (const pending of pendingSends.values()) pending.reject(error);
     pendingSends.clear();
+    if (!intentionallyClosed) options.onDisconnect?.();
   });
 
   await registered;
@@ -133,6 +146,9 @@ export async function connectTelegramBrokerClient(options: {
       if (messageId === undefined) throw new Error('Telegram broker did not return the prompt message ID.');
       return { messageId };
     },
-    close: () => socket.end(),
+    close: () => {
+      intentionallyClosed = true;
+      socket.end();
+    },
   };
 }

@@ -1,5 +1,9 @@
 import { randomBytes } from 'node:crypto';
 
+import type { TelegramBrokerState, TelegramBrokerStateStore } from './broker-state.js';
+import { TelegramOutboundQueue } from './outbound-queue.js';
+import type { TelegramOutboundPriority } from './outbound-queue.js';
+
 export interface TelegramTextUpdate {
   updateId: number;
   userId: number;
@@ -35,12 +39,24 @@ export type TelegramBrokerDelivery = {
   promptId?: string;
 };
 
-type DeliveryHandler = (delivery: TelegramBrokerDelivery) => void;
+export interface TelegramBrokerDiagnostic {
+  type: 'poll_error' | 'recovered' | 'queue_drop' | 'delivery_retry' | 'unprocessed';
+  threadId?: number;
+  attempt?: number;
+  errorCode?: string;
+  count?: number;
+}
+
+type DeliveryHandler = (delivery: TelegramBrokerDelivery) => Promise<void> | void;
+type UpdateResult = 'delivered' | 'ignored' | 'unprocessed';
 
 interface ConnectedProject extends TelegramProjectRegistration {
   clientId: string;
   deliver: DeliveryHandler;
 }
+
+const EMPTY_STATE: TelegramBrokerState = { processedUpdateIds: [], unprocessedByThread: {} };
+const MAX_PROCESSED_UPDATE_IDS = 1_000;
 
 export class TelegramBroker {
   private readonly projectsByClientId = new Map<string, ConnectedProject>();
@@ -50,16 +66,59 @@ export class TelegramBroker {
     string,
     { threadId: number; resolve(): void; reject(error: Error): void; timeout: ReturnType<typeof setTimeout> }
   >();
+  private readonly disabledThreads = new Set<number>();
+  private readonly outboundQueue: TelegramOutboundQueue;
+  private state: TelegramBrokerState = structuredClone(EMPTY_STATE);
+  private processedUpdateIds = new Set<number>();
+  private initialized = false;
+  private stateWrite = Promise.resolve();
 
   constructor(
     private readonly options: {
       allowedUserId: number;
       telegram: TelegramBrokerTransport;
+      stateStore?: TelegramBrokerStateStore;
+      outboundQueueSize?: number;
+      deliveryRetryBaseMs?: number;
+      deliveryRetryMaxMs?: number;
+      sleep?(delayMs: number): Promise<void>;
+      onDiagnostic?(diagnostic: TelegramBrokerDiagnostic): void;
     },
-  ) {}
+  ) {
+    this.outboundQueue = new TelegramOutboundQueue({
+      send: item => this.options.telegram.sendMessage(item.threadId, item.text),
+      maxSize: options.outboundQueueSize ?? 100,
+      retryBaseMs: options.deliveryRetryBaseMs ?? 500,
+      retryMaxMs: options.deliveryRetryMaxMs ?? 30_000,
+      ...(options.sleep ? { sleep: options.sleep } : {}),
+      onDrop: item => options.onDiagnostic?.({ type: 'queue_drop', threadId: item.threadId }),
+      onError: (error, attempt) =>
+        options.onDiagnostic?.({ type: 'delivery_retry', attempt, errorCode: safeErrorCode(error) }),
+      isRetryable: error => !isDeletedTopicError(error),
+      onPermanentFailure: item => {
+        this.disabledThreads.add(item.threadId);
+        const project = this.projectsByThreadId.get(item.threadId);
+        if (project) {
+          void Promise.resolve(
+            project.deliver({
+              type: 'message',
+              text: 'The saved Telegram topic is unavailable or deleted. Run `mastracode-remote --init` to repair it. This terminal session remains active locally.',
+            }),
+          ).catch(() => {});
+        }
+      },
+    });
+  }
 
   get clientCount(): number {
     return this.projectsByClientId.size;
+  }
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.state = this.options.stateStore ? await this.options.stateStore.load() : structuredClone(EMPTY_STATE);
+    this.processedUpdateIds = new Set(this.state.processedUpdateIds);
+    this.initialized = true;
   }
 
   register(clientId: string, registration: TelegramProjectRegistration, deliver: DeliveryHandler): void {
@@ -77,6 +136,25 @@ export class TelegramBroker {
     this.projectsByClientId.set(clientId, project);
     this.projectsByPath.set(project.projectPath, project);
     this.projectsByThreadId.set(project.threadId, project);
+
+    const unprocessed = this.state.unprocessedByThread[String(project.threadId)];
+    if (unprocessed) {
+      void Promise.resolve(
+        deliver({
+          type: 'message',
+          text: `${unprocessed} Telegram ${unprocessed === 1 ? 'instruction was' : 'instructions were'} not processed before the previous broker stopped. Please resend.`,
+        }),
+      )
+        .then(() => {
+          const key = String(project.threadId);
+          const current = this.state.unprocessedByThread[key] ?? 0;
+          if (current <= unprocessed) delete this.state.unprocessedByThread[key];
+          else this.state.unprocessedByThread[key] = current - unprocessed;
+          this.options.onDiagnostic?.({ type: 'unprocessed', threadId: project.threadId, count: unprocessed });
+          return this.persistState();
+        })
+        .catch(() => {});
+    }
   }
 
   unregister(clientId: string): void {
@@ -87,28 +165,59 @@ export class TelegramBroker {
     this.projectsByThreadId.delete(project.threadId);
   }
 
-  startPolling(options: { intervalMs?: number; onError?(error: Error): void } = {}): {
-    stop(): void;
-    done: Promise<void>;
-  } {
+  startPolling(
+    options: {
+      intervalMs?: number;
+      backoffBaseMs?: number;
+      backoffMaxMs?: number;
+      sleep?(delayMs: number): Promise<void>;
+      onError?(error: Error): void;
+    } = {},
+  ): { stop(): void; done: Promise<void> } {
     let stopped = false;
-    let nextOffset: number | undefined;
+    let consecutiveFailures = 0;
+    let disconnected = false;
     const abortController = new AbortController();
     const intervalMs = options.intervalMs ?? 250;
+    const backoffBaseMs = options.backoffBaseMs ?? 500;
+    const backoffMaxMs = options.backoffMaxMs ?? 30_000;
+    const wait = options.sleep ?? sleep;
     const done = (async () => {
+      await this.initialize();
       while (!stopped) {
+        let delay = intervalMs;
         try {
-          const updates = await this.options.telegram.getTextUpdates(nextOffset, abortController.signal);
-          for (const update of updates) {
-            nextOffset = Math.max(nextOffset ?? 0, update.updateId + 1);
-            await this.processUpdate(update);
+          const updates = await this.options.telegram.getTextUpdates(this.state.nextOffset, abortController.signal);
+          for (const update of [...updates].sort((left, right) => left.updateId - right.updateId)) {
+            await this.processPersistedUpdate(update);
           }
+          if (disconnected) {
+            disconnected = false;
+            for (const project of this.projectsByClientId.values()) {
+              this.queueProjectMessage(
+                project,
+                'Telegram connection recovered. The terminal session stayed active. Current status follows.',
+                'low',
+              );
+              void Promise.resolve(project.deliver({ type: 'message', text: '/status' })).catch(() => {});
+              this.options.onDiagnostic?.({ type: 'recovered', threadId: project.threadId });
+            }
+          }
+          consecutiveFailures = 0;
         } catch (error) {
-          if (!stopped) options.onError?.(error instanceof Error ? error : new Error(String(error)));
+          if (stopped) break;
+          disconnected = true;
+          consecutiveFailures += 1;
+          const normalized = error instanceof Error ? error : new Error(String(error));
+          options.onError?.(normalized);
+          this.options.onDiagnostic?.({
+            type: 'poll_error',
+            attempt: consecutiveFailures,
+            errorCode: safeErrorCode(normalized),
+          });
+          delay = Math.min(backoffMaxMs, backoffBaseMs * 2 ** (consecutiveFailures - 1));
         }
-        if (!stopped && intervalMs > 0) {
-          await new Promise(resolve => setTimeout(resolve, intervalMs));
-        }
+        if (!stopped && delay > 0) await wait(delay);
       }
     })();
     return {
@@ -145,31 +254,121 @@ export class TelegramBroker {
     await reply;
   }
 
-  async processUpdate(update: TelegramTextUpdate): Promise<void> {
-    if (update.routable === false || update.userId !== this.options.allowedUserId) return;
+  async processUpdate(update: TelegramTextUpdate): Promise<UpdateResult> {
+    if (update.routable === false || update.userId !== this.options.allowedUserId) return 'ignored';
     const waiter = this.roundTripWaiters.get(update.text.trim());
     if (waiter?.threadId === update.threadId) {
       clearTimeout(waiter.timeout);
       this.roundTripWaiters.delete(update.text.trim());
       waiter.resolve();
-      return;
+      return 'ignored';
     }
-    this.projectsByThreadId.get(update.threadId)?.deliver({
+    const project = this.projectsByThreadId.get(update.threadId);
+    if (!project) return 'unprocessed';
+    await project.deliver({
       type: 'message',
       text: update.text,
       ...(update.replyToMessageId === undefined ? {} : { replyToMessageId: update.replyToMessageId }),
       ...(update.promptId === undefined ? {} : { promptId: update.promptId }),
     });
+    return 'delivered';
   }
 
-  async sendProjectMessage(clientId: string, text: string): Promise<void> {
+  async sendProjectMessage(
+    clientId: string,
+    text: string,
+    priority: TelegramOutboundPriority = 'normal',
+  ): Promise<void> {
     const project = this.getProject(clientId);
-    await this.options.telegram.sendMessage(project.threadId, text);
+    if (this.disabledThreads.has(project.threadId)) {
+      throw new Error('The saved Telegram topic is unavailable. Run `mastracode-remote --init` to repair it.');
+    }
+    if (!this.queueProjectMessage(project, text, priority)) {
+      throw new Error('Telegram outbound queue is full. The message was not queued.');
+    }
   }
 
   async sendProjectPrompt(clientId: string, prompt: TelegramPrompt): Promise<{ messageId: number }> {
     const project = this.getProject(clientId);
-    return this.options.telegram.sendPrompt(project.threadId, prompt);
+    if (this.disabledThreads.has(project.threadId)) {
+      throw new Error('The saved Telegram topic is unavailable. Run `mastracode-remote --init` to repair it.');
+    }
+    try {
+      return await this.options.telegram.sendPrompt(project.threadId, prompt);
+    } catch (error) {
+      if (error instanceof Error && isDeletedTopicError(error)) {
+        this.disabledThreads.add(project.threadId);
+        void Promise.resolve(
+          project.deliver({
+            type: 'message',
+            text: 'The saved Telegram topic is unavailable or deleted. Run `mastracode-remote --init` to repair it. This terminal session remains active locally.',
+          }),
+        ).catch(() => {});
+      }
+      throw error;
+    }
+  }
+
+  shutdown(): void {
+    this.outboundQueue.stop();
+  }
+
+  private async processPersistedUpdate(update: TelegramTextUpdate): Promise<void> {
+    const previousOffset = this.state.nextOffset;
+    if (previousOffset !== undefined && update.updateId < previousOffset) {
+      await this.persistState();
+      return;
+    }
+    this.state.nextOffset = Math.max(previousOffset ?? 0, update.updateId + 1);
+    if (this.processedUpdateIds.has(update.updateId)) {
+      await this.persistState();
+      return;
+    }
+
+    this.processedUpdateIds.add(update.updateId);
+    this.state.processedUpdateIds.push(update.updateId);
+    if (this.state.processedUpdateIds.length > MAX_PROCESSED_UPDATE_IDS) {
+      const removed = this.state.processedUpdateIds.splice(
+        0,
+        this.state.processedUpdateIds.length - MAX_PROCESSED_UPDATE_IDS,
+      );
+      for (const updateId of removed) this.processedUpdateIds.delete(updateId);
+    }
+
+    const mayBeInstruction = update.routable !== false && update.userId === this.options.allowedUserId;
+    if (mayBeInstruction) this.incrementUnprocessed(update.threadId);
+    await this.persistState();
+
+    const result = await this.processUpdate(update);
+    if (mayBeInstruction && result !== 'unprocessed') {
+      this.decrementUnprocessed(update.threadId);
+      await this.persistState();
+    }
+  }
+
+  private incrementUnprocessed(threadId: number): void {
+    const key = String(threadId);
+    this.state.unprocessedByThread[key] = (this.state.unprocessedByThread[key] ?? 0) + 1;
+  }
+
+  private decrementUnprocessed(threadId: number): void {
+    const key = String(threadId);
+    const count = this.state.unprocessedByThread[key] ?? 0;
+    if (count <= 1) delete this.state.unprocessedByThread[key];
+    else this.state.unprocessedByThread[key] = count - 1;
+  }
+
+  private persistState(): Promise<void> {
+    const store = this.options.stateStore;
+    if (!store) return Promise.resolve();
+    const snapshot = structuredClone(this.state);
+    this.stateWrite = this.stateWrite.then(() => store.save(snapshot));
+    return this.stateWrite;
+  }
+
+  private queueProjectMessage(project: ConnectedProject, text: string, priority: TelegramOutboundPriority): boolean {
+    if (this.disabledThreads.has(project.threadId)) return false;
+    return this.outboundQueue.enqueue({ threadId: project.threadId, text, priority });
   }
 
   private getProject(clientId: string): ConnectedProject {
@@ -177,4 +376,17 @@ export class TelegramBroker {
     if (!project) throw new Error(`Telegram broker client ${clientId} is not registered.`);
     return project;
   }
+}
+
+function safeErrorCode(error: Error): string {
+  if ('code' in error && typeof error.code === 'string') return error.code;
+  return error.name || 'Error';
+}
+
+function isDeletedTopicError(error: Error): boolean {
+  return /message thread not found|topic (?:was )?(?:closed|deleted)|TOPIC_(?:CLOSED|DELETED)/i.test(error.message);
+}
+
+function sleep(delayMs: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, delayMs));
 }

@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { acquireTelegramBrokerLock } from './broker-lock.js';
+import { runBrokerUntilStopped } from './broker-main.js';
 
 const cleanupPaths: string[] = [];
 afterEach(async () => {
@@ -15,6 +16,29 @@ async function createLockPath(): Promise<string> {
   cleanupPaths.push(directory);
   return path.join(directory, 'broker.lock');
 }
+
+describe('Telegram broker lifecycle', () => {
+  it('closes client sockets when polling fails so TUIs can reconnect to a replacement broker', async () => {
+    const close = vi.fn(async () => {});
+    const failure = new Error('state write failed');
+
+    await expect(
+      runBrokerUntilStopped({ done: new Promise(() => {}), close }, { done: Promise.reject(failure), stop: vi.fn() }),
+    ).rejects.toThrow('state write failed');
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('stops polling after the last client closes the broker server', async () => {
+    const stop = vi.fn();
+
+    await runBrokerUntilStopped(
+      { done: Promise.resolve(), close: vi.fn(async () => {}) },
+      { done: Promise.resolve(), stop },
+    );
+
+    expect(stop).toHaveBeenCalledOnce();
+  });
+});
 
 describe('Telegram broker ownership lock', () => {
   it('does not replace a lock owned by a running broker process', async () => {

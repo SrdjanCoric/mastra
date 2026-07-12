@@ -16,7 +16,7 @@ interface TelegramResponse<T> {
   ok: boolean;
   result?: T;
   description?: string;
-  parameters?: { migrate_to_chat_id?: number };
+  parameters?: { migrate_to_chat_id?: number; retry_after?: number };
 }
 
 interface TelegramMessage {
@@ -249,9 +249,12 @@ export class TelegramBotClient implements TelegramProjectClient {
     const payload = (await response.json()) as TelegramResponse<T>;
     if (!response.ok || !payload.ok) {
       const migrated = payload.parameters?.migrate_to_chat_id;
-      throw new Error(
+      const error = new Error(
         `${payload.description ?? `Telegram ${method} failed`}${migrated ? ` migrate_to_chat_id=${migrated}` : ''}`,
-      );
+      ) as Error & { retryAfterMs?: number };
+      const retryAfter = payload.parameters?.retry_after;
+      if (retryAfter !== undefined) error.retryAfterMs = retryAfter * 1_000;
+      throw error;
     }
     return payload;
   }

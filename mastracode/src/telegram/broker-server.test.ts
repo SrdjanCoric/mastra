@@ -65,6 +65,68 @@ describe('Telegram broker socket', () => {
     await server.done;
   });
 
+  it('does not mark an instruction delivered until the TUI handler acknowledges it', async () => {
+    const socketPath = await createSocketPath();
+    const telegram = {
+      getTextUpdates: vi.fn(async () => []),
+      sendMessage: vi.fn(async () => {}),
+      sendPrompt: vi.fn(async () => ({ messageId: 1 })),
+    };
+    const broker = new TelegramBroker({ allowedUserId: 42, telegram });
+    const server = await startTelegramBrokerServer({ socketPath, broker });
+    let finishDelivery: (() => void) | undefined;
+    const onMessage = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          finishDelivery = resolve;
+        }),
+    );
+    const client = await connectTelegramBrokerClient({
+      socketPath,
+      registration: { projectPath: '/projects/one', threadId: 101 },
+      onMessage,
+    });
+    let delivered = false;
+
+    const processing = broker
+      .processUpdate({ updateId: 1, userId: 42, threadId: 101, text: 'wait for TUI' })
+      .then(() => {
+        delivered = true;
+      });
+    await waitFor(() => onMessage.mock.calls.length === 1);
+    expect(delivered).toBe(false);
+    finishDelivery?.();
+    await processing;
+
+    expect(delivered).toBe(true);
+    client.close();
+    await server.done;
+  });
+
+  it('disconnects active clients when the broker shuts down unexpectedly', async () => {
+    const socketPath = await createSocketPath();
+    const telegram = {
+      getTextUpdates: vi.fn(async () => []),
+      sendMessage: vi.fn(async () => {}),
+      sendPrompt: vi.fn(async () => ({ messageId: 1 })),
+    };
+    const broker = new TelegramBroker({ allowedUserId: 42, telegram });
+    const server = await startTelegramBrokerServer({ socketPath, broker });
+    const onDisconnect = vi.fn();
+    await connectTelegramBrokerClient({
+      socketPath,
+      registration: { projectPath: '/projects/one', threadId: 101 },
+      onMessage: vi.fn(),
+      onDisconnect,
+    });
+
+    await server.close();
+    await waitFor(() => onDisconnect.mock.calls.length === 1);
+
+    expect(server.isClosed()).toBe(true);
+    expect(broker.clientCount).toBe(0);
+  });
+
   it('shares one broker across project clients and exits after the last disconnect', async () => {
     const socketPath = await createSocketPath();
     const telegram = {
