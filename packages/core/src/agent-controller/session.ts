@@ -77,6 +77,13 @@ const MODE_ID_KEY = 'currentModeId';
 /** Persisted thread-setting key prefix for a mode's last-used model. */
 const modeModelKey = (modeId: string) => `modeModelId_${modeId}`;
 
+const MAX_DISPLAY_SHELL_OUTPUT_CHARS = 65_536;
+
+function appendBoundedDisplayOutput(current: string | undefined, output: string): string {
+  const combined = (current ?? '') + output;
+  return combined.length <= MAX_DISPLAY_SHELL_OUTPUT_CHARS ? combined : combined.slice(-MAX_DISPLAY_SHELL_OUTPUT_CHARS);
+}
+
 /**
  * Internal thread-metadata keys used by `Session.loadMetadata()` to persist
  * runtime bookkeeping (selected model/mode, observer/reflector config, token
@@ -2146,6 +2153,7 @@ export class SessionDisplayState {
           if (tool.status === 'running' || tool.status === 'streaming_input') {
             tool.status = 'error';
           }
+          tool.shellOutput = undefined;
         }
         ds.activeSubagents = new Map();
         break;
@@ -2222,6 +2230,7 @@ export class SessionDisplayState {
           endedTool.status = event.isError ? 'error' : 'completed';
           endedTool.result = event.result;
           endedTool.isError = event.isError;
+          endedTool.shellOutput = undefined;
         }
         // Track file modifications
         if (!event.isError) {
@@ -2248,8 +2257,8 @@ export class SessionDisplayState {
 
       case 'shell_output': {
         const shellTool = ds.activeTools.get(event.toolCallId);
-        if (shellTool) {
-          shellTool.shellOutput = (shellTool.shellOutput ?? '') + event.output;
+        if (shellTool && (shellTool.status === 'running' || shellTool.status === 'streaming_input')) {
+          shellTool.shellOutput = appendBoundedDisplayOutput(shellTool.shellOutput, event.output);
         }
         break;
       }

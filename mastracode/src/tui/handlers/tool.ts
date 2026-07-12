@@ -414,7 +414,6 @@ export function handleShellOutput(
   if (component?.appendStreamingOutput) {
     component.appendStreamingOutput(output);
     reconcileToolBoundaries(ctx);
-    state.ui.requestRender();
   }
 }
 

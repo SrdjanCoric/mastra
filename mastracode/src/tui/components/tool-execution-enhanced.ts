@@ -15,6 +15,7 @@ import { BOX_INDENT, getTermWidth, theme, mastra, tintHex, ensureTerminalGlyphCo
 import { truncateAnsi } from './ansi.js';
 import type { ChatSpacingKind } from './chat-spacing.js';
 import { ErrorDisplayComponent } from './error-display.js';
+import { BoundedShellOutputPreview, MAX_SHELL_PREVIEW_CHARS, MAX_SHELL_PREVIEW_LINES } from './shell-output-preview.js';
 import type {
   CompactToolLabelColor,
   IToolExecutionComponent,
@@ -198,7 +199,13 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
   private result?: ToolResult;
   private options: ToolExecutionOptions;
   private startTime = Date.now();
-  private streamingOutput = ''; // Buffer for streaming shell output
+  private streamingOutput = new BoundedShellOutputPreview({
+    maxChars: MAX_SHELL_PREVIEW_CHARS,
+    maxLines: MAX_SHELL_PREVIEW_LINES,
+  });
+  private streamingUpdateTimer: ReturnType<typeof setTimeout> | undefined;
+  private scheduledStreamingRebuilds = 0;
+  private completedStreamingFallback = '';
   private quietDisplayMode: QuietToolDisplayMode;
   private quietPreviewLineLimit: number;
   private compactToolContinuation = false;
@@ -232,6 +239,7 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
 
   updateArgs(args: unknown, rebuild = true): void {
     this.args = args;
+    this.streamingOutput.setLimits(this.getStreamingPreviewLimits());
     if (rebuild) this.rebuild();
   }
 
@@ -240,10 +248,15 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
   }
 
   updateResult(result: ToolResult, isPartial = false): void {
+    this.cancelStreamingUpdate();
     this.result = result;
     this.isPartial = isPartial;
-    // Keep streaming output for colored display in final result
+    if (!isPartial) {
+      const finalOutput = this.getFormattedOutput();
+      this.completedStreamingFallback = finalOutput.trim() ? '' : this.streamingOutput.toString();
+    }
     this.rebuild();
+    if (!isPartial) this.streamingOutput.clear();
   }
 
   /**
@@ -258,8 +271,60 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     ) {
       return;
     }
-    this.streamingOutput += output;
+    this.streamingOutput.setLimits(this.getStreamingPreviewLimits());
+    this.streamingOutput.append(output);
+    this.scheduleStreamingUpdate();
+  }
+
+  flushStreamingOutput(): void {
+    if (!this.streamingUpdateTimer) return;
+    this.cancelStreamingUpdate();
     this.rebuild();
+    this.ui.requestRender();
+  }
+
+  dispose(): void {
+    this.cancelStreamingUpdate();
+    this.streamingOutput.clear();
+  }
+
+  getStreamingPreviewDiagnostics(): { retainedChars: number; pendingUpdate: boolean; scheduledRebuilds: number } {
+    return {
+      retainedChars: this.streamingOutput.retainedChars,
+      pendingUpdate: this.streamingUpdateTimer !== undefined,
+      scheduledRebuilds: this.scheduledStreamingRebuilds,
+    };
+  }
+
+  private scheduleStreamingUpdate(): void {
+    if (this.streamingUpdateTimer) return;
+    this.streamingUpdateTimer = setTimeout(() => {
+      this.streamingUpdateTimer = undefined;
+      this.scheduledStreamingRebuilds += 1;
+      this.rebuild();
+      this.ui.requestRender();
+    }, 16);
+    this.streamingUpdateTimer.unref?.();
+  }
+
+  private cancelStreamingUpdate(): void {
+    if (!this.streamingUpdateTimer) return;
+    clearTimeout(this.streamingUpdateTimer);
+    this.streamingUpdateTimer = undefined;
+  }
+
+  private getStreamingPreviewLimits(): { maxChars: number; maxLines: number } {
+    const args = this.args as Record<string, unknown> | undefined;
+    const explicitTail = typeof args?.tail === 'number' && args.tail > 0 ? Math.floor(args.tail) : undefined;
+    const command = typeof args?.command === 'string' ? args.command : '';
+    const commandTailMatch = command.match(/\|\s*tail\s+(?:-n\s+)?(-?\d+)\s*$/);
+    const commandTail = commandTailMatch ? Math.abs(Number.parseInt(commandTailMatch[1]!, 10)) : undefined;
+    const requestedLines = explicitTail ?? commandTail;
+
+    return {
+      maxChars: MAX_SHELL_PREVIEW_CHARS,
+      maxLines: requestedLines ? Math.min(MAX_SHELL_PREVIEW_LINES, requestedLines) : MAX_SHELL_PREVIEW_LINES,
+    };
   }
 
   setExpanded(expanded: boolean): void {
@@ -1444,7 +1509,8 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
 
     if (!this.result || this.isPartial) {
       const status = this.getStatusIndicator();
-      let lines = this.streamingOutput ? this.streamingOutput.split('\n') : [];
+      const streamingOutput = this.streamingOutput.toString();
+      let lines = streamingOutput ? streamingOutput.split('\n') : [];
       // Remove leading empty lines during streaming
       while (lines.length > 0 && lines[0] === '') {
         lines.shift();
@@ -1481,7 +1547,7 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     // For errors, use bordered box with error status
     if (this.result.isError) {
       const status = theme.fg('error', ' ✗');
-      const output = this.streamingOutput.trim() || this.getFormattedOutput();
+      const output = this.getFormattedOutput() || this.completedStreamingFallback;
       renderBorderedShell(status, this.limitQuietShellLines(prepareOutputLines(output)));
       return;
     }
@@ -1493,14 +1559,14 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     );
     if (looksLikeError) {
       const status = theme.fg('error', ' ✗');
-      const output = this.streamingOutput.trim() || this.getFormattedOutput();
+      const output = this.getFormattedOutput() || this.completedStreamingFallback;
       renderBorderedShell(status, this.limitQuietShellLines(prepareOutputLines(output)));
       return;
     }
 
     // Success - use bordered box with checkmark
     const status = theme.fg('success', ' ✓');
-    const output = this.streamingOutput.trim() || this.getFormattedOutput();
+    const output = this.getFormattedOutput() || this.completedStreamingFallback;
     {
       renderBorderedShell(status, this.limitQuietShellLines(prepareOutputLines(output)));
     }
@@ -1544,7 +1610,8 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
 
     if (!this.result || this.isPartial) {
       const status = this.getStatusIndicator();
-      let lines = this.streamingOutput ? this.streamingOutput.split('\n') : [];
+      const streamingOutput = this.streamingOutput.toString();
+      let lines = streamingOutput ? streamingOutput.split('\n') : [];
       while (lines.length > 0 && lines[0] === '') lines.shift();
       while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
       renderBorderedProcess(status, lines);
@@ -1552,7 +1619,7 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     }
 
     const status = this.result.isError ? theme.fg('error', ' ✗') : theme.fg('success', ' ✓');
-    const output = this.streamingOutput.trim() || this.getFormattedOutput();
+    const output = this.getFormattedOutput() || this.completedStreamingFallback;
     {
       renderBorderedProcess(status, prepareOutputLines(output));
     }
