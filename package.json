@@ -80,7 +80,7 @@
     "test:durable:inngest": "pnpm --filter @mastra/inngest test:suite",
     "test:durable:inngest:unit": "pnpm --filter @mastra/inngest test:unit",
     "test:mastracode": "pnpm --filter ./mastracode test",
-    "format:check:mastracode": "pnpm --filter ./mastracode format:check && prettier --check .github/workflows/mastracode-remote-ci.yml .github/workflows/mastracode-remote-release.yml .github/codeql/mastracode-remote.yml SECURITY.md plans/PLAN.md plans/tasks/0011-apply-repository-guidelines-and-secure-releases.md plans/tasks/0012-reduce-active-task-cpu-and-memory.md",
+    "format:check:mastracode": "pnpm --filter ./mastracode format:check && prettier --check .github/workflows/mastracode-remote-ci.yml .github/workflows/mastracode-remote-release.yml .github/codeql/mastracode-remote.yml SECURITY.md plans/PLAN.md \"plans/tasks/**/*.md\"",
     "lint:mastracode": "pnpm --filter ./mastracode lint",
     "typecheck:mastracode": "pnpm --filter ./mastracode check",
     "test:coverage:mastracode": "pnpm --filter ./mastracode test:coverage",
