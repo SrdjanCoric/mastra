@@ -1,0 +1,80 @@
+name: Release MastraCode Remote
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published package version, without a leading v
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  PACKAGE_NAME: mastracode-remote
+
+jobs:
+  publish:
+    name: Verify and publish
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: npm-release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm and Node.js
+        uses: ./.github/actions/setup-pnpm-node
+
+      - name: Verify requested version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          package_version=$(node -p "require('./mastracode/package.json').version")
+          if [ "$package_version" != "$REQUESTED_VERSION" ]; then
+            echo "Package version $package_version does not match requested version $REQUESTED_VERSION." >&2
+            exit 1
+          fi
+          if npm view "$PACKAGE_NAME@$REQUESTED_VERSION" version >/dev/null 2>&1; then
+            echo "$PACKAGE_NAME@$REQUESTED_VERSION is already published." >&2
+            exit 1
+          fi
+
+      - name: Run release checks
+        run: pnpm check:mastracode
+
+      - name: Build exact release archive
+        id: archive
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/mastracode-release"
+          pnpm --filter ./mastracode pack --pack-destination "$RUNNER_TEMP/mastracode-release"
+          archive="$RUNNER_TEMP/mastracode-release/$PACKAGE_NAME-$REQUESTED_VERSION.tgz"
+          test -f "$archive"
+          echo "path=$archive" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "$archive" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          echo "bytes=$(stat -c %s "$archive")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload verified archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mastracode-remote-${{ inputs.version }}
+          path: ${{ steps.archive.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish verified archive
+        run: npm publish "${{ steps.archive.outputs.path }}" --access public --provenance
+
+      - name: Record publication proof
+        run: |
+          echo "Published $PACKAGE_NAME@${{ inputs.version }}"
+          echo "Archive SHA-256: ${{ steps.archive.outputs.sha256 }}"
+          echo "Archive bytes: ${{ steps.archive.outputs.bytes }}"

@@ -31,6 +31,7 @@ describe('buildSkillPaths', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('MASTRACODE_SKILLS_SCOPE', '');
     // Default: no directories exist
     mockedFs.existsSync.mockReturnValue(false);
     mockedFs.readdirSync.mockReturnValue([]);

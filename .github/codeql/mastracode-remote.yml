@@ -1,0 +1,10 @@
+name: MastraCode Remote CodeQL scope
+
+paths:
+  - mastracode/src
+  - packages/core/src/agent-controller
+
+paths-ignore:
+  - '**/*.test.ts'
+  - '**/__tests__/**'
+  - mastracode/src/web

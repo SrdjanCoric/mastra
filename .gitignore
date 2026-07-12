@@ -44,6 +44,7 @@ memory.db-*
 .npmrc
 
 # Test directories
+coverage/
 packages/core/test-outputs/
 voice/**/test-outputs/
 voice/**/test-data/

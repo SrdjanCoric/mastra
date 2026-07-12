@@ -22,11 +22,13 @@ function toStream(chunks: any[]) {
 afterEach(async () => {
   process.chdir(originalCwd);
   vi.resetModules();
+  vi.unstubAllEnvs();
 });
 
 describe('mastracode workspace skill activation', () => {
   it('activates a symlinked local skill by bare name through the mastracode workspace path', async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mastracode-workspace-skill-'));
+    vi.stubEnv('MASTRACODE_SKILLS_SCOPE', '');
 
     try {
       const skillName = 'temp-symlink-skill';

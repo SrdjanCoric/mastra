@@ -27,6 +27,8 @@ This is the project's master plan: a durable architectural header plus an ordere
 - **Recovery**: Telegram or broker failure degrades affected projects to local-only operation with bounded retries, broker-owned offsets/deduplication and prioritized delivery, safe socket/topic recovery, and no replay of unprocessed crash-era instructions.
 - **Implementation source**: the terminal-visible TUI implementation, Telegram bridge, recovery behavior, and tests live in this codebase. The package has no runtime or planning dependency on the legacy repository or headless daemon.
 - **Publication**: the publication gate requires focused unit/integration tests, concurrent multi-project broker coverage, TUI end-to-end coverage, isolated package verification, and one manual live Telegram test; a separate final task publishes the approved package to npm.
+- **Repository and release security**: fork-owned GitHub-hosted validation protects `main`; npm releases use trusted publishing with provenance and no long-lived npm token. Inherited workflows that require unavailable private infrastructure remain disabled.
+- **Active-task display performance**: live output keeps the current 1,000-line and 64-KiB capacity. Intermediate shell, tool, and subagent text uses adaptive display batching while errors, prompts, lifecycle events, user input, cancellation, and final results remain immediate.
 
 ---
 
@@ -42,3 +44,5 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0009 · Adopt the MastraCode Remote product identity (after 0008) → tasks/done/0009-adopt-the-mastracode-remote-product-identity.md (PR #10, `54b688fb`)
 - [x] 0007 · Prove and document the publishable package (after 0006, 0009) → tasks/done/0007-prove-and-document-the-publishable-package.md (PR #11, `1618e6b3`)
 - [x] 0010 · Publish MastraCode Remote to npm (after 0007) → tasks/done/0010-publish-mastracode-remote-to-npm.md (PR #12, `7f1ac495`)
+- [~] 0011 · Apply repository guidelines and secure releases → tasks/0011-apply-repository-guidelines-and-secure-releases.md
+- [ ] 0012 · Reduce active-task CPU and memory use (after 0011) → tasks/0012-reduce-active-task-cpu-and-memory.md
