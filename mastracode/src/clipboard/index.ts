@@ -2,10 +2,11 @@
  * Platform-specific clipboard image extraction.
  *
  * Checks the system clipboard for image data and returns it as base64.
- * Uses synchronous execution (execSync) since this only runs on paste events.
+ * Uses synchronous commands since this only runs on paste events.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { readFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -123,11 +124,13 @@ function getMacClipboardImage(): ClipboardImage | null {
       coercion: 'TIFF picture',
       extension: 'tiff',
       mimeType: 'image/tiff',
+      convertToPng: true,
     }) ??
     tryReadMacClipboardImage({
       coercion: '«class TIFF»',
       extension: 'tiff',
       mimeType: 'image/tiff',
+      convertToPng: true,
     })
   );
 }
@@ -136,17 +139,21 @@ function tryReadMacClipboardImage({
   coercion,
   extension,
   mimeType,
+  convertToPng = false,
 }: {
   coercion: string;
   extension: string;
   mimeType: string;
+  convertToPng?: boolean;
 }): ClipboardImage | null {
-  const tmpFile = join(tmpdir(), `mastra-clipboard-${Date.now()}.${extension}`);
+  const tempName = `mastra-clipboard-${randomUUID()}`;
+  const sourceFile = join(tmpdir(), `${tempName}.${extension}`);
+  const outputFile = convertToPng ? join(tmpdir(), `${tempName}.png`) : sourceFile;
 
   try {
     const script = `
 			set theImage to the clipboard as ${coercion}
-			set theFile to open for access POSIX file "${tmpFile}" with write permission
+			set theFile to open for access POSIX file "${sourceFile}" with write permission
 			write theImage to theFile
 			close access theFile
 		`;
@@ -155,22 +162,31 @@ function tryReadMacClipboardImage({
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
-    const buffer = readFileSync(tmpFile);
+    if (convertToPng) {
+      execFileSync('sips', ['-s', 'format', 'png', sourceFile, '--out', outputFile], {
+        timeout: 5000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    }
+
+    const buffer = readFileSync(outputFile);
     if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
       return null;
     }
 
     return {
       data: buffer.toString('base64'),
-      mimeType,
+      mimeType: convertToPng ? 'image/png' : mimeType,
     };
   } catch {
     return null;
   } finally {
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      // ignore cleanup errors
+    for (const file of new Set([sourceFile, outputFile])) {
+      try {
+        unlinkSync(file);
+      } catch {
+        // ignore cleanup errors
+      }
     }
   }
 }

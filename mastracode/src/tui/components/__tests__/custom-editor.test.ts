@@ -393,6 +393,41 @@ describe('CustomEditor image paste handling', () => {
     expect(mocks.superHandleInput).not.toHaveBeenCalled();
   });
 
+  it('reports unreadable supported image files without inserting the path as prompt text', () => {
+    mocks.statSync.mockImplementation(() => {
+      throw new Error('unreadable');
+    });
+
+    const editor = new CustomEditor({} as any, {} as any);
+    const onImagePaste = vi.fn();
+    const onImagePasteError = vi.fn();
+    editor.onImagePaste = onImagePaste;
+    editor.onImagePasteError = onImagePasteError;
+
+    editor.handleInput(`${PASTE_START}/tmp/unreadable-image.png${PASTE_END}`);
+
+    expect(onImagePaste).not.toHaveBeenCalled();
+    expect(onImagePasteError).toHaveBeenCalledWith('Could not read the pasted image.');
+    expect(mocks.superHandleInput).not.toHaveBeenCalled();
+  });
+
+  it.each(['/tmp/unsupported-image.heic', 'https://example.com/unsupported-image.tiff?download=1'])(
+    'reports image formats unsupported by the model input path: %s',
+    pastedImage => {
+      const editor = new CustomEditor({} as any, {} as any);
+      const onImagePaste = vi.fn();
+      const onImagePasteError = vi.fn();
+      editor.onImagePaste = onImagePaste;
+      editor.onImagePasteError = onImagePasteError;
+
+      editor.handleInput(`${PASTE_START}${pastedImage}${PASTE_END}`);
+
+      expect(onImagePaste).not.toHaveBeenCalled();
+      expect(onImagePasteError).toHaveBeenCalledWith('Unsupported image format. Use PNG, JPEG, GIF, or WebP.');
+      expect(mocks.superHandleInput).not.toHaveBeenCalled();
+    },
+  );
+
   it('passes through non-image file paths as text', () => {
     mocks.getClipboardImage.mockReturnValue({ data: 'clipboard-image', mimeType: 'image/png' });
 

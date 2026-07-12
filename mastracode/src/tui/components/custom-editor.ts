@@ -29,12 +29,10 @@ const IMAGE_MIME_TYPES_BY_EXTENSION: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.webp': 'image/webp',
-  '.bmp': 'image/bmp',
-  '.tif': 'image/tiff',
-  '.tiff': 'image/tiff',
-  '.heic': 'image/heic',
-  '.heif': 'image/heif',
 };
+const UNSUPPORTED_IMAGE_EXTENSIONS = new Set(['.bmp', '.tif', '.tiff', '.heic', '.heif']);
+
+type PastedImageSource = { image: ClipboardImage } | { error: string };
 
 /**
  * Push-to-talk voice input interface the editor drives. Implemented by
@@ -126,6 +124,7 @@ export class CustomEditor extends Editor {
   public onCtrlD?: () => void;
   public escapeEnabled = true;
   public onImagePaste?: (image: ClipboardImage) => void;
+  public onImagePasteError?: (message: string) => void;
   public getModeColor?: () => string | undefined;
   public getPromptAnimator?: () => GradientAnimator | undefined;
   private pendingBracketedPaste: string | null = null;
@@ -442,7 +441,11 @@ export class CustomEditor extends Editor {
 
     const pastedImageSource = this.readPastedImageSource(pasteContent);
     if (pastedImageSource) {
-      this.onImagePaste?.(pastedImageSource);
+      if ('image' in pastedImageSource) {
+        this.onImagePaste?.(pastedImageSource.image);
+      } else {
+        this.onImagePasteError?.(pastedImageSource.error);
+      }
       if (afterPaste.length > 0) {
         this.handleInput(afterPaste);
       }
@@ -472,7 +475,7 @@ export class CustomEditor extends Editor {
     return getClipboardImage();
   }
 
-  private readPastedImageSource(pasteContent: string): ClipboardImage | null {
+  private readPastedImageSource(pasteContent: string): PastedImageSource | null {
     if (!this.onImagePaste) {
       return null;
     }
@@ -482,13 +485,19 @@ export class CustomEditor extends Editor {
       return null;
     }
 
+    if (this.hasUnsupportedImageExtension(normalizedPaste)) {
+      return { error: 'Unsupported image format. Use PNG, JPEG, GIF, or WebP.' };
+    }
+
     const imageUrl = this.normalizePastedImageUrl(normalizedPaste);
     if (imageUrl) {
       const mimeType = this.getImageMimeType(imageUrl);
       return mimeType
         ? {
-            data: imageUrl,
-            mimeType,
+            image: {
+              data: imageUrl,
+              mimeType,
+            },
           }
         : null;
     }
@@ -505,15 +514,17 @@ export class CustomEditor extends Editor {
 
     try {
       if (!statSync(filePath).isFile()) {
-        return null;
+        return { error: 'Could not read the pasted image.' };
       }
 
       return {
-        data: readFileSync(filePath).toString('base64'),
-        mimeType,
+        image: {
+          data: readFileSync(filePath).toString('base64'),
+          mimeType,
+        },
       };
     } catch {
-      return null;
+      return { error: 'Could not read the pasted image.' };
     }
   }
 
@@ -558,6 +569,15 @@ export class CustomEditor extends Editor {
     }
 
     return pasteContent;
+  }
+
+  private hasUnsupportedImageExtension(pathOrUrl: string): boolean {
+    try {
+      const extensionSource = /^https?:\/\//i.test(pathOrUrl) ? new URL(pathOrUrl).pathname : pathOrUrl;
+      return UNSUPPORTED_IMAGE_EXTENSIONS.has(extname(extensionSource).toLowerCase());
+    } catch {
+      return false;
+    }
   }
 
   private getImageMimeType(pathOrUrl: string): string | null {

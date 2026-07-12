@@ -22,7 +22,7 @@ export const clipboardImagePasteScenario = {
     rmSync(RAW_REQUEST_CAPTURE_PATH, { force: true });
   },
   async inProcessApp({ startMastraCodeApp }) {
-    const restoreFetch = installOpenAIFetchCapture({ capturePath: RAW_REQUEST_CAPTURE_PATH });
+    const restoreFetch = installOpenAIFetchCapture({ capturePath: RAW_REQUEST_CAPTURE_PATH, append: true });
     const app = await startMastraCodeApp();
     return {
       stop: async () => {
@@ -49,23 +49,41 @@ export const clipboardImagePasteScenario = {
     terminal.submit('');
     await runtime.waitForScreenText(/\[1 image\]\s+Please inspect the pasted image/i, terminal);
     await runtime.waitForScreenText(/MC clipboard image paste response/i, terminal);
-    runtime.printScreen('after image response', terminal);
+
+    terminal.write(`${PASTE_START}${imagePath}${PASTE_END}`);
+    await runtime.waitForScreenText(/\[image\]/i, terminal);
+    terminal.submit('');
+    await runtime.waitForScreenText(/MC image-only paste response/i, terminal);
+
+    const unsupportedImagePath = join(imageDir, 'unsupported-image.heic');
+    writeFileSync(unsupportedImagePath, Buffer.from(TINY_PNG_BASE64, 'base64'));
+    terminal.write(`${PASTE_START}${unsupportedImagePath}${PASTE_END}`);
+    await runtime.waitForScreenText(/Unsupported image format\. Use PNG, JPEG, GIF, or WebP\./i, terminal);
+    runtime.printScreen('after mixed, image-only, and unsupported image prompts', terminal);
   },
   verifyAimockRequests(requests) {
-    if (requests.length !== 1) {
-      throw new Error(`Expected one AIMock request, received ${requests.length}`);
+    if (requests.length !== 2) {
+      throw new Error(`Expected two AIMock requests, received ${requests.length}`);
     }
     const body = JSON.stringify(getRequestBody(requests[0]));
     if (!body.includes('Please inspect the pasted image')) {
       throw new Error('Expected submitted text content in AIMock request');
     }
 
-    const rawRequestBody = readFileSync(RAW_REQUEST_CAPTURE_PATH, 'utf8');
-    if (!rawRequestBody.includes('image/png') || !rawRequestBody.includes(TINY_PNG_BASE64)) {
-      throw new Error(`Expected pasted PNG attachment data in raw OpenAI request: ${rawRequestBody.slice(0, 2000)}`);
+    const rawRequests = readFileSync(RAW_REQUEST_CAPTURE_PATH, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as { body: string });
+    if (rawRequests.length !== 2) {
+      throw new Error(`Expected two raw OpenAI requests, received ${rawRequests.length}`);
     }
-    if (rawRequestBody.includes('[image]')) {
-      throw new Error('Expected editor image placeholder to be removed before raw provider request');
+    for (const request of rawRequests) {
+      if (!request.body.includes('image/png') || !request.body.includes(TINY_PNG_BASE64)) {
+        throw new Error('Expected pasted PNG attachment data in raw OpenAI request');
+      }
+      if (request.body.includes('[image]')) {
+        throw new Error('Expected editor image placeholder to be removed before raw provider request');
+      }
     }
   },
 } satisfies McE2eScenario;
