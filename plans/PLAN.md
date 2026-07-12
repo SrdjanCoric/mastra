@@ -55,3 +55,4 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0020 · Return while-active replies to Telegram (after 0013) → tasks/done/0020-return-while-active-replies-to-telegram.md
 - [x] 0021 · Fix terminal image prompts (after 0020) → tasks/done/0021-fix-terminal-image-prompts.md
 - [x] 0022 · Fix managed workflow E2E status proof (after 0017) → tasks/done/0022-fix-managed-workflow-e2e-status.md
+- [~] 0023 · Show managed workflows as unlimited (after 0022) → tasks/0023-show-managed-workflows-as-unlimited.md

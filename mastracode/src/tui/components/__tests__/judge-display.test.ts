@@ -48,6 +48,30 @@ describe('JudgeDisplayComponent', () => {
     expect(new Set(widths).size).toBe(1);
   });
 
+  it('renders unbounded goal evaluations without a finite turn limit', () => {
+    const component = new JudgeDisplayComponent();
+
+    component.setEvaluation({
+      objective: 'mastra workflow',
+      iteration: 3,
+      maxRuns: 50,
+      unbounded: true,
+      passed: false,
+      status: 'active',
+      results: [],
+      reason: 'Continue the managed workflow.',
+      duration: 0,
+      timedOut: false,
+      maxRunsReached: false,
+      suppressFeedback: false,
+    });
+
+    const rendered = renderPlain(component).join('\n');
+
+    expect(rendered).toContain('(3 runs, unlimited)');
+    expect(rendered).not.toContain('(3/50)');
+  });
+
   it('renders judge failures as paused instead of continue', () => {
     const component = new JudgeDisplayComponent(
       {

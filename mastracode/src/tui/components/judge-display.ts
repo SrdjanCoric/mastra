@@ -37,14 +37,16 @@ export class JudgeDisplayComponent extends Container {
   private result: GoalJudgeResult | null;
   private turnsUsed: number;
   private maxTurns: number;
+  private unbounded: boolean;
   private activity: string[] = [];
   private streamingReason = '';
 
-  constructor(result: GoalJudgeResult | null = null, turnsUsed = 0, maxTurns = 0) {
+  constructor(result: GoalJudgeResult | null = null, turnsUsed = 0, maxTurns = 0, unbounded = false) {
     super();
     this.result = result;
     this.turnsUsed = turnsUsed;
     this.maxTurns = maxTurns;
+    this.unbounded = unbounded;
     this.renderContent();
   }
 
@@ -63,21 +65,27 @@ export class JudgeDisplayComponent extends Container {
     this.renderContent();
   }
 
-  setResult(result: GoalJudgeResult, turnsUsed: number, maxTurns: number): void {
+  setResult(result: GoalJudgeResult, turnsUsed: number, maxTurns: number, unbounded = false): void {
     this.result = result;
     this.streamingReason = '';
     this.turnsUsed = turnsUsed;
     this.maxTurns = maxTurns;
+    this.unbounded = unbounded;
     this.renderContent();
   }
 
   /** Render the result of an in-loop goal evaluation chunk. */
   setEvaluation(payload: GoalEvaluationPayload): void {
-    this.setResult(evaluationToJudgeResult(payload), payload.iteration, payload.maxRuns);
+    this.setResult(evaluationToJudgeResult(payload), payload.iteration, payload.maxRuns, payload.unbounded === true);
   }
 
   setInterrupted(): void {
-    this.setResult({ decision: 'paused', reason: 'Judge evaluation was interrupted.' }, this.turnsUsed, this.maxTurns);
+    this.setResult(
+      { decision: 'paused', reason: 'Judge evaluation was interrupted.' },
+      this.turnsUsed,
+      this.maxTurns,
+      this.unbounded,
+    );
   }
 
   private renderContent(): void {
@@ -136,7 +144,11 @@ export class JudgeDisplayComponent extends Container {
             ? '◌'
             : '○';
     const decisionText = getDecisionText(this.result.decision);
-    const turnInfo = this.maxTurns > 0 ? chalk.hex(MUTED_COLOR)(`(${this.turnsUsed}/${this.maxTurns})`) : '';
+    const turnInfo = this.unbounded
+      ? chalk.hex(MUTED_COLOR)(`(${this.turnsUsed} runs, unlimited)`)
+      : this.maxTurns > 0
+        ? chalk.hex(MUTED_COLOR)(`(${this.turnsUsed}/${this.maxTurns})`)
+        : '';
     return `${title}  ${decisionIcon} ${decisionText}${turnInfo ? `  ${turnInfo}` : ''}`;
   }
 

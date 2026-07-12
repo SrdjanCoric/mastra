@@ -69,6 +69,24 @@ describe('GoalStateProcessor', () => {
     expect(result!.attributes).toMatchObject({ status: 'active', runsUsed: 0, maxRuns: 5 });
   });
 
+  it('projects unbounded objectives without a finite max-runs attribute', async () => {
+    const { processor } = await createProcessor(objective({ runsUsed: 3, maxRuns: 50, unbounded: true }));
+    const result = await processor.computeStateSignal(createArgs({ hasSnapshot: false }));
+
+    expect(result!.attributes).toMatchObject({ status: 'active', runsUsed: 3, unbounded: true });
+    expect(result!.attributes).not.toHaveProperty('maxRuns');
+  });
+
+  it('re-emits when the unbounded setting changes', async () => {
+    const { processor } = await createProcessor(objective({ unbounded: true }));
+    const result = await processor.computeStateSignal(
+      createArgs({ lastSnapshot: objective({ unbounded: false }), hasSnapshot: true }),
+    );
+
+    expect(result).toBeTruthy();
+    expect(result!.attributes).toMatchObject({ unbounded: true });
+  });
+
   it('emits nothing when unchanged and the base is still in window', async () => {
     const { processor } = await createProcessor(objective());
     const result = await processor.computeStateSignal(createArgs({ lastSnapshot: objective(), hasSnapshot: true }));

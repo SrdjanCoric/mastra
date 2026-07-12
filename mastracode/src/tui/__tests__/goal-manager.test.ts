@@ -96,6 +96,22 @@ describe('GoalManager adapter', () => {
     expect(goal).toMatchObject({ maxTurns: 50, unbounded: true });
   });
 
+  it('keeps unbounded managed-workflow objectives unbounded when saving thread state', async () => {
+    const agent = createAgent();
+    const state = createState(agent);
+    const manager = new GoalManager();
+    await manager.setGoal(state, 'mastra workflow', '__GATEWAY_OPENAI_MODEL__', 50, { unbounded: true });
+    manager.pause('Waiting for approval.');
+
+    await manager.saveToThread(state);
+    manager.resume();
+
+    expect(agent.updateObjectiveOptions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ threadId: 'parent-thread', status: 'paused', maxRuns: 50, unbounded: true }),
+    );
+    expect(manager.getGoal()).toMatchObject({ status: 'active', unbounded: true });
+  });
+
   it('falls back to a local record when no agent or thread is available', async () => {
     const state = createState(undefined, undefined);
     const manager = new GoalManager();
@@ -196,6 +212,7 @@ describe('GoalManager adapter', () => {
         status: 'active',
         turnsUsed: 1,
         maxTurns: 20,
+        unbounded: true,
         judgeModelId: '__GATEWAY_OPENAI_MODEL__',
         startedAt: '2026-05-15T10:00:00.000Z',
         activeStartedAt: '2026-05-15T10:00:00.000Z',
@@ -207,6 +224,7 @@ describe('GoalManager adapter', () => {
       objective: 'finish the task',
       turnsUsed: 1,
       maxTurns: 20,
+      unbounded: true,
       activeDurationMs: 10 * 60_000,
       activeStartedAt: undefined,
     });

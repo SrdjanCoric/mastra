@@ -250,6 +250,7 @@ export class GoalManager {
             ...(this.record.pausedReason ? { pausedReason: this.record.pausedReason } : {}),
             ...(this.record.judgeModelId ? { judgeModelId: this.record.judgeModelId } : {}),
             ...(this.record.maxRuns !== undefined ? { maxRuns: this.record.maxRuns } : {}),
+            ...(this.record.unbounded ? { unbounded: true } : {}),
           });
           if (!updated) {
             // No persisted record yet: create one. `setObjective` always writes
@@ -263,6 +264,7 @@ export class GoalManager {
               resourceId: state.session.identity.getResourceId(),
               ...(this.record.judgeModelId ? { judgeModelId: this.record.judgeModelId } : {}),
               ...(this.record.maxRuns !== undefined ? { maxRuns: this.record.maxRuns } : {}),
+              ...(this.record.unbounded ? { unbounded: true } : {}),
             });
             if (desiredStatus !== 'active') {
               await agent.updateObjectiveOptions({
@@ -323,6 +325,7 @@ export class GoalManager {
         status: saved.status,
         runsUsed: saved.turnsUsed ?? 0,
         maxRuns: saved.maxTurns ?? DEFAULT_MAX_TURNS,
+        ...(saved.unbounded ? { unbounded: true } : {}),
         judgeModelId: saved.judgeModelId ?? '',
         startedAt: saved.startedAt ? Date.parse(saved.startedAt) || Date.now() : Date.now(),
         updatedAt: Date.now(),

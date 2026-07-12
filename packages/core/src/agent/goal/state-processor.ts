@@ -12,7 +12,7 @@ import { getObjectiveFromRequestContext, GOAL_STATE_ID, GOAL_STATE_TYPE, resolve
 //
 // Unlike the task list, the objective is small and changes infrequently, so this
 // processor is snapshot-only: every emission is a full `<current-objective>`
-// snapshot. It emits when the objective (text/status/runsUsed/maxRuns) changes,
+// snapshot. It emits when the objective (text/status/runsUsed/maxRuns/unbounded) changes,
 // re-snapshots when observational memory drops the base from the window, and
 // otherwise stays silent so the cached prefix is not invalidated.
 //
@@ -36,7 +36,7 @@ function lp(value: string): string {
 }
 
 function stableObjectiveCacheKey(record: GoalObjectiveRecord, maxRuns: number): string {
-  return `goal:${lp(record.objective)}${lp(record.status)}${lp(String(record.runsUsed))}${lp(String(maxRuns))}`;
+  return `goal:${lp(record.objective)}${lp(record.status)}${lp(String(record.runsUsed))}${lp(String(maxRuns))}${lp(String(record.unbounded === true))}`;
 }
 
 type ResolvedThreadStateStore = {
@@ -127,7 +127,7 @@ export class GoalStateProcessor {
       attributes: {
         status: current.status,
         runsUsed: current.runsUsed,
-        ...(maxRuns ? { maxRuns } : {}),
+        ...(current.unbounded ? { unbounded: true } : maxRuns ? { maxRuns } : {}),
       },
       metadata: { value: { objective: current } },
     };

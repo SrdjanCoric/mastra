@@ -249,7 +249,7 @@ export function handleGoalEvaluation(ctx: EventHandlerContext, payload: GoalEval
   let activeGoalJudge = state.activeGoalJudge;
   if (!activeGoalJudge) {
     const goal = state.goalManager.getGoal();
-    const component = new JudgeDisplayComponent(null, payload.iteration, payload.maxRuns);
+    const component = new JudgeDisplayComponent(null, payload.iteration, payload.maxRuns, payload.unbounded === true);
     activeGoalJudge = {
       modelId: goal?.judgeModelId ?? '',
       abortController: new AbortController(),
