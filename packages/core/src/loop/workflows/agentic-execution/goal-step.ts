@@ -222,6 +222,7 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
               objective: record.objective,
               iteration: record.runsUsed + 1,
               maxRuns: effective.maxRuns,
+              unbounded: effective.unbounded,
               passed: false,
               status: record.status,
               results: [],

@@ -34,8 +34,9 @@ export const persistentGoalJudgeDecisionScenario: McE2eScenario = {
     terminal.submit(STATUS_MESSAGE);
 
     await runtime.waitForScreenText(/Status received; autonomous work will continue/i, terminal, 15_000);
+    await runtime.waitForScreenText(/Goal\s+○\s+continue\s+\(1 runs, unlimited\)/i, terminal, 15_000);
     await runtime.waitForScreenText(/Second autonomous workflow task completed/i, terminal, 15_000);
-    await runtime.waitForScreenText(/Goal\s+●\s+done/i, terminal, 15_000);
+    await runtime.waitForScreenText(/Goal\s+●\s+done\s+\(2 runs, unlimited\)/i, terminal, 15_000);
     await runtime.waitForScreenText(/Both autonomous workflow tasks are complete/i, terminal, 15_000);
 
     terminal.submit('/goal status');
@@ -57,6 +58,12 @@ export const persistentGoalJudgeDecisionScenario: McE2eScenario = {
     }
     if (!normalizedBody.includes('Continue autonomous goal work')) {
       throw new Error('Expected the goal judge prompt to require continuation after the status interjection');
+    }
+    if (!/<current-objective[^>]*unbounded="true"/.test(normalizedBody)) {
+      throw new Error('Expected managed-workflow model context to identify the current objective as unbounded');
+    }
+    if (/<current-objective[^>]*maxRuns=/.test(normalizedBody)) {
+      throw new Error('Expected unbounded managed-workflow context not to advertise a finite max-runs limit');
     }
   },
 };
