@@ -15,10 +15,10 @@ export type SystemCommandRunner = (command: string, args: string[], cwd?: string
 
 export async function checkSystemPrerequisites(runner: SystemCommandRunner = run): Promise<void> {
   if (Number(process.versions.node.split('.')[0]) < 22) {
-    throw new Error('Install Node 22 or newer, then rerun `mastracode-telegram --init`.');
+    throw new Error('Install Node 22 or newer, then rerun `mastracode-remote --init`.');
   }
   if (!(await commandExists(runner, 'git', ['--version']))) {
-    throw new Error('Install Git, then rerun `mastracode-telegram --init`.');
+    throw new Error('Install Git, then rerun `mastracode-remote --init`.');
   }
   if (!(await commandExists(runner, 'gh', ['--version']))) {
     throw new Error(githubCliInstallInstructions());
@@ -41,7 +41,7 @@ export async function checkMastraCodeReadiness(env: NodeJS.ProcessEnv): Promise<
   } catch {}
 
   throw new Error(
-    'MastraCode provider setup was not detected. Run normal `mastracode`, complete provider login and model setup, then rerun `mastracode-telegram --init`.',
+    'MastraCode provider setup was not detected. Run normal `mastracode`, complete provider login and model setup, then rerun `mastracode-remote --init`.',
   );
 }
 
@@ -101,7 +101,7 @@ export function githubCliInstallInstructions(): string {
     'Then connect it to your GitHub account:',
     '  gh auth login',
     '',
-    'Choose GitHub.com, HTTPS, and Login with a web browser. Verify with `gh auth status`, then rerun `mastracode-telegram --init`.',
+    'Choose GitHub.com, HTTPS, and Login with a web browser. Verify with `gh auth status`, then rerun `mastracode-remote --init`.',
   ].join('\n');
 }
 
@@ -112,7 +112,7 @@ export function githubAuthInstructions(): string {
     'Run:',
     '  gh auth login',
     '',
-    'Choose GitHub.com, HTTPS, and Login with a web browser. Verify with `gh auth status`, then rerun `mastracode-telegram --init`.',
+    'Choose GitHub.com, HTTPS, and Login with a web browser. Verify with `gh auth status`, then rerun `mastracode-remote --init`.',
   ].join('\n');
 }
 

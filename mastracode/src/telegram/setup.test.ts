@@ -121,9 +121,7 @@ describe('initializeTelegramProject', () => {
   it('stops on prerequisite, MastraCode, GitHub, and Telegram validation errors without writing readiness', async () => {
     const checks: Array<Partial<TelegramSetupDependencies>> = [
       {
-        checkPrerequisites: vi
-          .fn()
-          .mockRejectedValue(new Error('Install Git, then rerun `mastracode-telegram --init`.')),
+        checkPrerequisites: vi.fn().mockRejectedValue(new Error('Install Git, then rerun `mastracode-remote --init`.')),
       },
       { checkMastraCode: vi.fn().mockRejectedValue(new Error('Run normal `mastracode` first.')) },
       { checkGitHub: vi.fn().mockRejectedValue(new Error('Run `gh auth login`, then rerun init.')) },

@@ -1,16 +1,17 @@
 {
-  "name": "@srdjancoric/mastracode-telegram",
-  "version": "0.1.0",
-  "description": "MastraCode TUI with an optional in-process Telegram interface",
+  "name": "mastracode-remote",
+  "version": "0.1.3",
+  "description": "MastraCode with Telegram. Run the normal terminal TUI and continue the same session from Telegram.",
   "type": "module",
   "files": [
     "dist",
     "!dist/web",
+    "!dist/headless",
     "assets/skills",
     "README.md",
     "CHANGELOG.md"
   ],
-  "homepage": "https://github.com/SrdjanCoric/mastra/tree/main/mastracode",
+  "homepage": "https://github.com/SrdjanCoric/mastra/tree/main/mastracode#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SrdjanCoric/mastra.git",
@@ -22,7 +23,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "mastracode-telegram": "./dist/telegram-cli.js"
+    "mastracode-remote": "./dist/telegram-cli.js"
   },
   "exports": {
     ".": {
@@ -53,16 +54,6 @@
       "require": {
         "types": "./dist/acp.d.ts",
         "default": "./dist/acp.cjs"
-      }
-    },
-    "./headless": {
-      "import": {
-        "types": "./dist/headless/index.d.ts",
-        "default": "./dist/headless.js"
-      },
-      "require": {
-        "types": "./dist/headless/index.d.ts",
-        "default": "./dist/headless.cjs"
       }
     },
     "./plugin": {
@@ -99,7 +90,7 @@
     "web:start": "mastra start --env src/web/.env"
   },
   "keywords": [],
-  "author": "",
+  "author": "Srdjan Coric",
   "license": "Apache-2.0",
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.21.0",

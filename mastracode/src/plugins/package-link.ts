@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const MASTRACODE_PACKAGE_NAMES = new Set(['mastracode', '@srdjancoric/mastracode-telegram']);
+const MASTRACODE_PACKAGE_NAMES = new Set(['mastracode', 'mastracode-remote']);
 const MASTRACODE_PACKAGE_ROOT = findMastraCodePackageRoot(path.dirname(fileURLToPath(import.meta.url)));
 
 export function findMastraCodePackageRoot(startDir: string): string {

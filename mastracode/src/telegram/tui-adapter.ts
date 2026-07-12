@@ -20,7 +20,7 @@ export function createTelegramTuiBridge(env: NodeJS.ProcessEnv = process.env): T
     async start(onMessage) {
       projectLock = await acquireTelegramProjectLock(resolveTelegramProjectLockPath(homeDir, projectPath));
       if (!projectLock) {
-        throw new Error(`Another MastraCode Telegram session is already using this project: ${projectPath}`);
+        throw new Error(`Another MastraCode Remote session is already using this project: ${projectPath}`);
       }
       try {
         client = await connectToTelegramBroker({

@@ -33,7 +33,7 @@ export async function syncTelegramWorkflowSkills(
     const source = path.join(sourceDir, name);
     const packagedHash = await hashSkill(source).catch(() => undefined);
     if (!packagedHash) {
-      throw new Error(`Packaged workflow skill ${name} is missing. Reinstall @srdjancoric/mastracode-telegram.`);
+      throw new Error(`Packaged workflow skill ${name} is missing. Reinstall mastracode-remote.`);
     }
 
     const target = path.join(destination, name);

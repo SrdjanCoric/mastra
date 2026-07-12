@@ -76,7 +76,7 @@ describe('createTelegramTuiBridge', () => {
     });
 
     await expect(bridge.start(vi.fn())).rejects.toThrow(
-      'Another MastraCode Telegram session is already using this project: /projects/example',
+      'Another MastraCode Remote session is already using this project: /projects/example',
     );
     expect(mocks.connectToTelegramBroker).not.toHaveBeenCalled();
   });

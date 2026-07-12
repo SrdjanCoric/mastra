@@ -12,7 +12,7 @@ import type { SlashCommandContext } from './types.js';
 
 export async function handleUpdateCommand(ctx: SlashCommandContext): Promise<void> {
   if (process.env.MASTRACODE_DISABLE_UPDATE_CHECK === '1' || process.env.MASTRACODE_TELEGRAM_ENABLED === '1') {
-    ctx.showInfo('Updates for this distribution are managed through @srdjancoric/mastracode-telegram.');
+    ctx.showInfo('Updates for this distribution are managed through mastracode-remote.');
     return;
   }
 

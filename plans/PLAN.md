@@ -17,7 +17,7 @@ This is the project's master plan: a durable architectural header plus an ordere
 - **Package and commands**: publish only the `mastracode/` workspace as `mastracode-remote`; `mastracode-remote --init` prepares isolated state and `mastracode-remote` starts the visible MastraCode TUI with Telegram attached to the same session. The official `mastracode` package and executable remain unchanged.
 - **Description**: "MastraCode with Telegram. Run the normal terminal TUI and continue the same session from Telegram."
 - **Isolation**: the new TUI-backed runtime keeps its config, state, locks, logs, readiness markers, and Telegram resources separate from legacy `mastracode-remote` 0.1.x state and launchd services.
-- **Ownership**: `SrdjanCoric/mastra` is the implementation source while the package remains coupled to MastraCode internals. The existing npm organization `mastracode-remote` owns `@mastracode-remote/mastracode-runtime`; the public CLI package remains `mastracode-remote` with access controlled by `SrdjanCoric` and the organization. No external bridge repository is required to build or run the package.
+- **Ownership**: `SrdjanCoric/mastra` is the implementation source and `mastracode-remote` is the self-contained public package. It does not depend on a separately published runtime or an external bridge repository. Package access remains controlled by `SrdjanCoric`.
 - **Skills**: this build discovers skills only from project-local and global `.mastracode/skills` directories.
 - **Routing**: projects share one private forum group, each canonical project maps to one persistent topic, and the broker routes that topic to its one Telegram-enabled TUI owner; the topic follows the TUI's active thread.
 - **Input**: authorized Telegram text enters the native follow-up queue and retains source metadata only in the TUI presentation.
@@ -39,6 +39,6 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0005 · Resolve questions and approvals from either surface (after 0004) → tasks/done/0005-resolve-questions-and-approvals-from-either-surface.md (PR #5, `9860eb39`)
 - [x] 0006 · Recover safely from Telegram and process failures (after 0005) → tasks/done/0006-recover-safely-from-telegram-and-process-failures.md (PR #8, `78d2e203`)
 - [x] 0008 · Bound shell-output rendering (after 0005) → tasks/done/0008-bound-shell-output-rendering.md (PR #9, `60b1ea8f`)
-- [ ] 0009 · Adopt the MastraCode Remote product identity (after 0008) → tasks/0009-adopt-the-mastracode-remote-product-identity.md
+- [>] 0009 · Adopt the MastraCode Remote product identity (after 0008) → tasks/0009-adopt-the-mastracode-remote-product-identity.md (PR #10)
 - [ ] 0007 · Prove and document the publishable package (after 0006, 0009) → tasks/0007-prove-and-document-the-publishable-package.md
 - [ ] 0010 · Publish MastraCode Remote to npm (after 0007) → tasks/0010-publish-mastracode-remote-to-npm.md

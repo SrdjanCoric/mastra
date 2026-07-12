@@ -16,7 +16,7 @@ export async function runTelegramCli(args: string[], handlers: TelegramCliHandle
   }
   if (args.includes('--init')) {
     if (args.length !== 1) {
-      throw new Error('Usage: mastracode-telegram --init');
+      throw new Error('Usage: mastracode-remote --init');
     }
     await handlers.initialize();
     return;
