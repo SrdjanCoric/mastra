@@ -261,7 +261,7 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     expect(lines[0]).not.toContain('⟶');
   });
 
-  it('renders quiet list tools with result preview lines', () => {
+  it('renders quiet file discovery as one compact pattern and path line', () => {
     const component = new ToolExecutionComponentEnhanced(
       'find_files',
       { path: 'src', pattern: '**/*.ts' },
@@ -274,14 +274,43 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
       isError: false,
     });
 
-    const rendered = component.render(100).join('\n');
-    const output = stripAnsi(rendered);
-    expect(output).toContain('▐list▌src (5 results)');
-    expect(output).not.toContain('│ .');
-    expect(rendered).toContain(theme.fg('toolOutput', 'src/a.ts'));
-    expect(rendered).toContain(theme.fg('toolOutput', 'src/b.ts'));
-    expect(output).not.toContain('src/c.ts');
-    expect(output).toContain('╰──');
+    const output = stripAnsi(component.render(100).join('\n'));
+    expect(output).toContain('▐list▌"**/*.ts" · src (5 results)');
+    expect(output).not.toContain('src/a.ts');
+    expect(output).not.toContain('│');
+    expect(output.split('\n')).toHaveLength(1);
+  });
+
+  it('renders quiet content search as one compact pattern and path line', () => {
+    const component = new ToolExecutionComponentEnhanced(
+      'search_content',
+      { pattern: 'createTool', path: 'src/**/*.ts' },
+      { quietDisplayMode: 'quiet', collapsedByDefault: true },
+      ui,
+    );
+
+    component.updateResult({
+      content: [{ type: 'text', text: 'src/tool.ts:42:createTool({' }],
+      isError: false,
+    });
+
+    const output = stripAnsi(component.render(100).join('\n'));
+    expect(output).toContain('▐grep▌"createTool" · src/**/*.ts');
+    expect(output).not.toContain('src/tool.ts:42');
+    expect(output.split('\n')).toHaveLength(1);
+  });
+
+  it('escapes multiline and quoted search patterns on the compact activity line', () => {
+    const component = new ToolExecutionComponentEnhanced(
+      'search_content',
+      { pattern: 'first\n"second"', path: 'src' },
+      { quietDisplayMode: 'quiet', collapsedByDefault: true },
+      ui,
+    );
+
+    const output = stripAnsi(component.render(100).join('\n'));
+    expect(output).toContain('▐grep▌"first\\n\\"second\\"" · src');
+    expect(output.split('\n')).toHaveLength(1);
   });
 
   it('renders quiet web search with query summary and compact result preview', () => {
@@ -476,7 +505,7 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     expect(output).not.toContain('╭──');
   });
 
-  it('renders quiet edit tools with line ranges from the tool result', () => {
+  it('renders quiet edit tools as one compact path and line-range line', () => {
     const component = new ToolExecutionComponentEnhanced(
       'string_replace_lsp',
       { path: 'src/example.ts', old_string: 'old', new_string: 'new' },
@@ -489,17 +518,14 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
       isError: false,
     });
 
-    const output = component.render(100).join('\n');
-    const visible = stripAnsi(output);
-    expect(output).toContain('edit');
-    expect(visible).toContain('src/example.ts:42-44');
-    expect(visible).toContain('new');
-    expect(visible).not.toContain('old →');
-    expect(output).not.toContain('old_string=');
-    expect(output.split('\n')).toHaveLength(3);
+    const visible = stripAnsi(component.render(100).join('\n'));
+    expect(visible).toContain('▐edit▌src/example.ts:42-44');
+    expect(visible).not.toContain('new');
+    expect(visible).not.toContain('old');
+    expect(visible.split('\n')).toHaveLength(1);
   });
 
-  it('updates the quiet edit preview line from partial args', () => {
+  it('does not render partial before or after source for quiet edits', () => {
     const component = new ToolExecutionComponentEnhanced(
       'string_replace_lsp',
       { path: 'src/example.ts', old_string: 'old value' },
@@ -507,17 +533,13 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
       ui,
     );
 
-    let lines = component.render(100);
-    expect(lines).toHaveLength(1);
-
     component.updateArgs({ path: 'src/example.ts', old_string: 'old value', new_string: 'new value\nmore' });
-    lines = component.render(100);
-    expect(lines).toHaveLength(4);
-    expect(stripAnsi(lines[1]!)).toContain('new value');
-    expect(stripAnsi(lines[2]!)).toContain('more');
-    expect(stripAnsi(lines[3]!)).toContain('╰──');
-    expect(stripAnsi(lines.join('\n'))).not.toContain('old value');
-    expect(stripAnsi(lines.join('\n'))).not.toContain('(2 lines)');
+    const visible = stripAnsi(component.render(100).join('\n'));
+    expect(visible).toContain('▐edit▌src/example.ts');
+    expect(visible).not.toContain('old value');
+    expect(visible).not.toContain('new value');
+    expect(visible).not.toContain('more');
+    expect(visible.split('\n')).toHaveLength(1);
   });
 
   it('renders quiet write tools with path and content preview lines', () => {
@@ -702,7 +724,7 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     expect(lines.join('\n')).not.toContain('╰─');
   });
 
-  it('streams quiet grep path on the tool line and pattern on the detail line', () => {
+  it('keeps quiet grep pattern, path, and result count on one compact line', () => {
     const component = new ToolExecutionComponentEnhanced(
       'search_content',
       { pattern: 'foo' },
@@ -710,30 +732,23 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
       ui,
     );
 
-    let lines = component.render(100);
-    expect(lines).toHaveLength(3);
-    expect(lines[0]).toContain('grep');
-    expect(lines[0]).not.toContain('foo');
-    expect(lines[1]).toContain('│');
-    expect(lines[1]).toContain(theme.fg('toolOutput', 'foo'));
-    expect(stripAnsi(lines[2]!)).toContain('╰──');
+    let lines = component.render(100).map(stripAnsi);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('▐grep▌"foo" · .');
 
     component.updateArgs({ pattern: 'foo', path: 'src/**/*.ts' });
-    lines = component.render(100);
-    expect(lines).toHaveLength(3);
-    expect(lines[0]).toContain('src/**/*.ts');
-    expect(lines[0]).not.toContain('foo');
-    expect(lines[1]).toContain('│');
-    expect(lines[1]).toContain(theme.fg('toolOutput', 'foo'));
-    expect(lines[1]).not.toContain('src/**/*.ts');
-    expect(stripAnsi(lines[2]!)).toContain('╰──');
+    lines = component.render(100).map(stripAnsi);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('▐grep▌"foo" · src/**/*.ts');
 
     component.updateResult({
       content: [{ type: 'text', text: '2 matches across 1 file\nsrc/a.ts:1:foo\nsrc/b.ts:2:foo' }],
       isError: false,
     });
-    lines = component.render(100);
-    expect(stripAnsi(lines[1]!)).toContain('foo (2 results)');
+    lines = component.render(100).map(stripAnsi);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('▐grep▌"foo" · src/**/*.ts (2 results)');
+    expect(lines[0]).not.toContain('src/a.ts:1');
   });
 
   it('renders quiet skill tools with the skill name only', () => {
@@ -999,7 +1014,7 @@ Test plan:
     second.setCompactToolContinuation(true, 'packages/app/src/example.ts:4-4');
     const completedVisible = stripAnsi(second.render(100).join('\n'));
     expect(completedVisible).toContain('src/example.ts:8-8');
-    expect(completedVisible).toMatch(/●─+ \/src\/example\.ts:8-8/);
+    expect(completedVisible).toMatch(/╰─+ \/src\/example\.ts:8-8/);
   });
 
   it('keeps same-file continuation connector geometry when both edits have line ranges', () => {
@@ -1031,7 +1046,7 @@ Test plan:
 
     const visible = stripAnsi(component.render(220).join('\n'));
     expect(visible).toContain('/components/payment-metho');
-    expect(visible).toMatch(/●─+ \/components\/payment-metho/);
+    expect(visible).toMatch(/╰─+ \/components\/payment-metho/);
   });
 
   it('renders standalone incomplete continuations with a tool label instead of a blank call', () => {

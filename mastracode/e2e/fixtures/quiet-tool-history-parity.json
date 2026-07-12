@@ -18,6 +18,31 @@
             }
           },
           {
+            "id": "call_quiet_live_edit",
+            "name": "string_replace_lsp",
+            "arguments": {
+              "path": "src/quiet-mode-e2e.ts",
+              "old_string": "export const QUIET_MODE_LIVE_PREVIEW = \"live quiet compact preview\";",
+              "new_string": "export const COMPACT_EDIT_SOURCE_MUST_STAY_HIDDEN = true;"
+            }
+          },
+          {
+            "id": "call_quiet_live_search",
+            "name": "search_content",
+            "arguments": {
+              "pattern": "QUIET_MODE",
+              "path": "src/quiet-mode-e2e.ts"
+            }
+          },
+          {
+            "id": "call_quiet_live_find",
+            "name": "find_files",
+            "arguments": {
+              "path": "src",
+              "pattern": "**/*.ts"
+            }
+          },
+          {
             "id": "call_quiet_live_task",
             "name": "task_write",
             "arguments": {

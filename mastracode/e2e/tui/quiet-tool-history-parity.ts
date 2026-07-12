@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { expect } from './expect.js';
 import type { McE2eScenario } from './types.js';
 
 function quoteSql(value: string): string {
@@ -84,8 +85,12 @@ values
     terminal.submit('Render quiet mode live tool output.');
     await runtime.waitForScreenText(/▐view▌src\/quiet-mode-e2e\.ts/i, terminal, 12_000);
     await runtime.waitForScreenText(/QUIET_MODE_LOADED_PREVIEW/i, terminal, 12_000);
+    await runtime.waitForScreenText(/▐edit▌src\/quiet-mode-e2e\.ts/i, terminal, 12_000);
+    await runtime.waitForScreenText(/▐grep▌"QUIET_MODE" · src\/quiet-mode-e2e\.ts/i, terminal, 12_000);
+    await runtime.waitForScreenText(/▐list▌"\*\*\/\*\.ts" · src/i, terminal, 12_000);
     await runtime.waitForScreenText(/0\/1\s+.*Verify quiet live task summary/i, terminal, 12_000);
     await runtime.waitForScreenText(/Quiet live tool output complete\./i, terminal, 12_000);
+    expect(terminal.serialize().view).not.toContain('COMPACT_EDIT_SOURCE_MUST_STAY_HIDDEN');
     runtime.printScreen('quiet live tool output', terminal);
 
     terminal.submit('/threads');
@@ -108,7 +113,18 @@ values
       throw new Error(`Expected quiet mode scenario to make 2 AIMock requests, received ${requests.length}`);
     }
     const serialized = JSON.stringify(requests);
-    for (const needle of ['call_quiet_live_view', 'call_quiet_live_task', 'view', 'task_write']) {
+    for (const needle of [
+      'call_quiet_live_view',
+      'call_quiet_live_edit',
+      'call_quiet_live_search',
+      'call_quiet_live_find',
+      'call_quiet_live_task',
+      'view',
+      'string_replace_lsp',
+      'search_content',
+      'find_files',
+      'task_write',
+    ]) {
       if (!serialized.includes(needle)) {
         throw new Error(`Expected AIMock request flow to include ${needle}`);
       }
