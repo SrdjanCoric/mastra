@@ -1,7 +1,7 @@
 # Task 0014: Debug Mastra workflow continuation
 
 **Branch**: `fix/mastra-workflow-continuation`
-**Depends on**: 0012
+**Depends on**: 0016
 **Source**: repeated workflow interruption reports 2026-07-12 · **User stories**: start `mastra workflow --run` once and have it continue through review, PR, merge, sync, and every remaining task; receive status replies without stopping the active workflow; require another user message only for a real checkpoint or explicit stop
 
 ## What to build
