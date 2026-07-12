@@ -89,6 +89,30 @@ describe('prepareGuidedProjectRepository', () => {
     expect(output).toContain('GitHub: created tracker as private and configured remote origin.');
   });
 
+  it('keeps a nested working directory as the Telegram project inside a parent Git repository', async () => {
+    const repositoryRoot = await temporaryProject();
+    const projectPath = path.join(repositoryRoot, 'test-app');
+    await fs.mkdir(projectPath);
+    const canonicalProjectPath = await fs.realpath(projectPath);
+    const runner: SystemCommandRunner = vi.fn(async (command, args) => {
+      const invocation = `${command} ${args.join(' ')}`;
+      if (invocation === 'git rev-parse --show-toplevel') return repositoryRoot;
+      if (invocation === 'git config user.name') return 'Test User';
+      if (invocation === 'git config user.email') return 'test@example.com';
+      if (invocation === 'git remote -v') return 'origin\thttps://github.com/example/repository.git (fetch)';
+      throw new Error(`Unexpected command: ${invocation}`);
+    });
+    const prompter = {
+      ask: vi.fn(),
+      confirm: vi.fn(),
+      choose: vi.fn(),
+    };
+
+    await expect(prepareGuidedProjectRepository({ projectPath, prompter, write: vi.fn(), runner })).resolves.toBe(
+      canonicalProjectPath,
+    );
+  });
+
   it('allows the user to choose a public GitHub repository', async () => {
     const projectPath = await temporaryProject();
     const canonicalPath = await fs.realpath(projectPath);
