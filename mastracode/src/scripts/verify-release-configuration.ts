@@ -39,6 +39,7 @@ async function main(): Promise<void> {
   assert(ciWorkflow.includes('run: pnpm check:mastracode:tests'), 'MastraCode CI must run canonical test checks.');
   assert(ciWorkflow.includes('run: pnpm check:mastracode:package'), 'MastraCode CI must run canonical package checks.');
   assert(ciWorkflow.match(/Restore Turbo build cache/g)?.length === 3, 'Each build job must restore its Turbo cache.');
+  assert(ciWorkflow.includes("- 'packages/core/**'"), 'MastraCode CI must run for direct workspace dependencies.');
   assert(!ciWorkflow.includes("- 'plans/**'"), 'Plan-only changes must not start MastraCode package CI.');
   assert(ciWorkflow.includes('github/codeql-action/analyze@'), 'MastraCode CI must include scoped CodeQL analysis.');
   assert(releaseWorkflow.includes('workflow_dispatch:'), 'Releases must require a manual workflow dispatch.');

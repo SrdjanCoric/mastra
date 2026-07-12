@@ -49,7 +49,7 @@ jobs:
         run: |
           for attempt in {1..60}; do
             conclusion=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA/check-runs" \
-              --jq '[.check_runs[] | select(.name == "Validate package")][0].conclusion // "pending"')
+              --jq '[.check_runs[] | select(.name == "Validate package" and .conclusion == "success")][0].conclusion // ([.check_runs[] | select(.name == "Validate package")][0].conclusion // "pending")')
             if [ "$conclusion" = "success" ]; then
               exit 0
             fi
