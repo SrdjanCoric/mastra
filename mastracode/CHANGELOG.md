@@ -8,10 +8,12 @@
 - Sent receipts and completed replies for Telegram messages back to the project topic without forwarding terminal-only replies.
 - Split Telegram setup verification into separate prompt and code messages, with case-insensitive verification replies.
 - Converted macOS TIFF clipboard images to PNG and rejected unreadable or unsupported terminal images before starting a model turn.
+- Sent terminal image-and-text and image-only submissions into an active run instead of leaving them in the follow-up queue.
+- Kept repeated goal-judge evaluations stateless so prior judge decisions and tool results do not increase later evaluation input.
 
 ### Changed
 
-- Replaced partial source previews for file edits, searches, and discovery with compact path, pattern, line-range, and result-count summaries.
+- Replaced partial source previews for file activity with compact project-relative paths, patterns, line ranges, and result counts.
 - Preserved unlimited managed-workflow state in model context, persisted thread state, status output, and live goal cards.
 
 ## 0.2.4
