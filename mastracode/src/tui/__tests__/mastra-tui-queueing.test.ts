@@ -538,6 +538,54 @@ describe('MastraTUI queueing', () => {
     expect(resolution).toEqual({ resolved: false, value: undefined });
   });
 
+  it.each([
+    ['image and text', 'inspect this [image]', 'inspect this'],
+    ['image only', '[image] ', ''],
+  ])('sends %s submissions as active signals instead of silently queuing them', async (_case, input, content) => {
+    const editor = {
+      onSubmit: undefined as ((text: string) => void) | undefined,
+      addToHistory: vi.fn(),
+      setText: vi.fn(),
+    };
+    const image = { data: 'data:image/png;base64,abc', mimeType: 'image/png' };
+    const state = {
+      editor,
+      session: { run: { isRunning: vi.fn(() => true) } },
+      pendingSlashCommands: [],
+      pendingQueuedActions: [],
+      pendingFollowUpMessages: [],
+      pendingImages: [image],
+      ui: { requestRender: vi.fn() },
+      chatContainer: {},
+      followUpComponents: [],
+    };
+
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: typeof state;
+      getUserInput: () => Promise<string>;
+      queueFollowUpMessage: (text: string) => void;
+      signalMessage: (text: string, images?: Array<{ data: string; mimeType: string }>) => void;
+    };
+    tui.state = state;
+    tui.queueFollowUpMessage = vi.fn();
+    tui.signalMessage = vi.fn();
+
+    const pendingInput = tui.getUserInput();
+    editor.onSubmit?.(input);
+
+    expect(editor.addToHistory).toHaveBeenCalledWith(input);
+    expect(editor.setText).toHaveBeenCalledWith('');
+    expect(tui.signalMessage).toHaveBeenCalledWith(content, [image]);
+    expect(tui.queueFollowUpMessage).not.toHaveBeenCalled();
+    expect(state.pendingImages).toEqual([]);
+
+    const resolution = await Promise.race([
+      pendingInput.then(value => ({ resolved: true as const, value })),
+      Promise.resolve({ resolved: false as const, value: undefined }),
+    ]);
+    expect(resolution).toEqual({ resolved: false, value: undefined });
+  });
+
   it('runs slash commands immediately instead of queuing while the controller is running', async () => {
     const editor = {
       onSubmit: undefined as ((text: string) => void) | undefined,
