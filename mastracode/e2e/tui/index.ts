@@ -1,4 +1,5 @@
 import { abortFollowupScenario } from './abort-followup.js';
+import { activeImageInterjectionScenario } from './active-image-interjection.js';
 import { activeSignalFollowupScenario } from './active-signal-followup.js';
 import { apiKeyDeleteEnvScenario } from './api-key-delete-env.js';
 import { apiKeyMultiProviderDeleteScenario } from './api-key-multi-provider-delete.js';
@@ -153,6 +154,7 @@ export const scenarios: Record<ScenarioName, McE2eScenario> = {
   startup: startupScenario,
   'abort-followup': abortFollowupScenario,
   'branch-context-long-name': branchContextLongNameScenario,
+  'active-image-interjection': activeImageInterjectionScenario,
   'active-signal-followup': activeSignalFollowupScenario,
   'autocomplete-wrapping-navigation': autocompleteWrappingNavigationScenario,
   'api-key-delete-env': apiKeyDeleteEnvScenario,

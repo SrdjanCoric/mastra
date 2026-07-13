@@ -1380,12 +1380,10 @@ export class MastraTUI {
           const { content, images } = consumePendingImages(text, this.state.pendingImages);
           this.state.pendingImages = [];
           if (images?.length) {
-            this.state.pendingImages = images;
-            this.queueFollowUpMessage(text);
-            return;
+            this.signalMessage(content, images);
+          } else {
+            this.signalMessage(content);
           }
-
-          this.signalMessage(content);
           return;
         }
 

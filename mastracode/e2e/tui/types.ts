@@ -7,6 +7,7 @@ export type ScenarioName =
   | 'startup'
   | 'abort-followup'
   | 'branch-context-long-name'
+  | 'active-image-interjection'
   | 'active-signal-followup'
   | 'autocomplete-wrapping-navigation'
   | 'api-key-delete-env'
