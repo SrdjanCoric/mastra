@@ -1,7 +1,7 @@
 import { visibleWidth } from '@earendil-works/pi-tui';
 import chalk from 'chalk';
 import { describe, it, expect, vi } from 'vitest';
-import { theme, tintHex, ensureTerminalGlyphContrast } from '../../theme.js';
+import { theme } from '../../theme.js';
 import { ToolExecutionComponentEnhanced, parseErrorFromContent } from '../tool-execution-enhanced.js';
 
 const ui = { requestRender() {} } as any;
@@ -65,7 +65,7 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     expect(visible).not.toContain('third');
   });
 
-  it('renders quiet view tools with a path range summary and content preview', () => {
+  it('renders quiet view tools as one path-range line without partial source', () => {
     const component = new ToolExecutionComponentEnhanced(
       'view',
       { path: 'src/example.ts', offset: 10, limit: 5, showLineNumbers: true },
@@ -80,34 +80,31 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
 
     const output = component.render(100).join('\n');
     const visible = stripAnsi(output);
-    expect(output).toContain('view');
+    expect(visible).toContain('view');
     expect(visible).toContain('src/example.ts:10-14');
-    expect(output).not.toContain('path=');
-    expect(output).not.toContain('✓');
-    expect(output).not.toContain('╭──');
-    expect(visible).toContain('│ const first = 1;');
-    expect(visible).toContain('│ const second = 2;');
-    expect(visible).toContain('╰──');
-    expect(output.split('\n')).toHaveLength(4);
+    expect(visible).not.toContain('const first');
+    expect(visible).not.toContain('const second');
+    expect(output.split('\n')).toHaveLength(1);
   });
 
-  it('highlights quiet view previews before truncating displayed lines', () => {
+  it('does not process or render large quiet view results as source previews', () => {
     const component = new ToolExecutionComponentEnhanced(
       'view',
-      { path: 'src/example.ts', offset: 1, limit: 1, showLineNumbers: true },
+      { path: 'src/large.ts', offset: 1, limit: 20_000, showLineNumbers: true },
       { quietDisplayMode: 'quiet', quietPreviewLineLimit: 8, collapsedByDefault: true },
       ui,
     );
-    const longLine = `     1→const value = '${'x'.repeat(400)}';`;
+    const output = Array.from(
+      { length: 20_000 },
+      (_, index) => `${String(index + 1).padStart(6)}→export const value${index} = '${'x'.repeat(120)}';`,
+    ).join('\n');
 
-    component.updateResult({
-      content: [{ type: 'text', text: longLine }],
-      isError: false,
-    });
+    component.updateResult({ content: [{ type: 'text', text: output }], isError: false });
 
-    const output = component.render(120).join('\n');
-    expect(stripAnsi(output)).not.toContain('\u001b');
-    expect(stripAnsi(output)).toContain('│ const value =');
+    const visible = stripAnsi(component.render(120).join('\n'));
+    expect(visible).toContain('src/large.ts:1-20000');
+    expect(visible).not.toContain('export const');
+    expect(visible.split('\n')).toHaveLength(1);
   });
 
   it('shows exactly the immediate dirname and filename once continuation paths are available', () => {
@@ -151,7 +148,8 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     component.setCompactToolContinuation(true, 'mastracode/src/tui/components/tool-execution-enhanced.ts:1-2');
 
     const output = stripAnsi(component.render(100).join('\n'));
-    expect(output).toContain('────────────');
+    expect(output).toContain('…');
+    expect(output).not.toMatch(/─{4,}/);
     expect(output).not.toContain('mastracode/s');
   });
 
@@ -166,7 +164,8 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     component.setCompactToolContinuation(true, 'mastracode/s');
 
     const output = stripAnsi(component.render(100).join('\n'));
-    expect(output).toContain('────────────');
+    expect(output).toContain('…');
+    expect(output).not.toMatch(/─{4,}/);
     expect(output).not.toContain('src');
   });
 
@@ -226,7 +225,8 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     component.setCompactToolContinuation(true, 'mastracode/lib/tool-execution-enhanced.ts:1-2');
 
     const output = stripAnsi(component.render(100).join('\n'));
-    expect(output).toContain('────────────────');
+    expect(output).toContain('…');
+    expect(output).not.toMatch(/─{4,}/);
     expect(output).not.toContain('mastracode/lib');
     expect(output).not.toContain('/lib/');
   });
@@ -464,7 +464,7 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     expect(output).toContain(chalk.hex(modeColor)('▐'));
     expect(output).toContain(chalk.bgHex(modeColor).hex('#000000').bold('view'));
     expect(output).toContain(chalk.bgHex('#141414').hex(modeColor)('src/example.ts'));
-    expect(output).toContain(chalk.hex(ensureTerminalGlyphContrast(tintHex(modeColor, 0.35)))('│'));
+    expect(stripAnsi(output)).not.toContain('const value');
   });
 
   it('renders quiet non-shell tool validation errors with actionable details', () => {
@@ -542,7 +542,7 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     expect(visible.split('\n')).toHaveLength(1);
   });
 
-  it('renders quiet write tools with path and content preview lines', () => {
+  it('renders quiet write tools as one path line without partial source', () => {
     const component = new ToolExecutionComponentEnhanced(
       'write_file',
       { path: '/tmp/example.ts', content: "import { x } from 'y';\nconsole.log(x);" },
@@ -552,176 +552,29 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
 
     component.updateResult({ content: [{ type: 'text', text: 'done' }], isError: false });
 
-    const output = component.render(140).join('\n');
-    const visible = stripAnsi(output);
+    const visible = stripAnsi(component.render(140).join('\n'));
     expect(visible).toContain('write');
     expect(visible).toContain('/tmp/example.ts');
-    expect(visible).toContain("import { x } from 'y';");
-    expect(visible).toContain('console.log(x);');
-    expect(visible).toContain('│');
-    expect(visible).not.toContain('(2 lines)');
-    expect(visible).not.toContain('content=');
-    expect(output.split('\n')).toHaveLength(4);
+    expect(visible).not.toContain('import');
+    expect(visible).not.toContain('console.log');
+    expect(visible.split('\n')).toHaveLength(1);
   });
 
-  it('renders a quiet write preview line with content preview', () => {
+  it('keeps grouped quiet write continuations compact without source previews', () => {
     const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      { path: '/tmp/example.ts', content: 'first line\nsecond line' },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true },
-      ui,
-    );
-
-    const lines = component.render(100);
-    expect(lines).toHaveLength(4);
-    expect(lines[0]).toContain('write');
-    expect(lines[1]).toContain('│');
-    expect(lines[1]).not.toContain('/tmp/example.ts');
-    expect(lines[1]).toContain('first line');
-    expect(lines[2]).toContain('second line');
-    expect(stripAnsi(lines[3]!)).toContain('╰──');
-    expect(lines.join('\n')).not.toContain('(2 lines)');
-  });
-
-  it('preserves left indentation in quiet code previews', () => {
-    const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      { path: '/tmp/example.ts', content: 'if (ok) {\n  return value;\n}' },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true },
-      ui,
-    );
-
-    const lines = component.render(100).map(stripAnsi);
-    expect(lines[1]).toContain('│   return value;');
-  });
-
-  it('hides quiet detail previews when the preview line limit is zero', () => {
-    const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      { path: '/tmp/example.ts', content: 'first line\nsecond line' },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true, quietPreviewLineLimit: 0 },
-      ui,
-    );
-
-    const lines = component.render(100).map(stripAnsi);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain('▐write▌/tmp/example.ts');
-    expect(lines.join('\n')).not.toContain('first line');
-    expect(component.hasQuietStreamingPreview()).toBe(false);
-  });
-
-  it('uses the configured quiet detail preview line limit', () => {
-    const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      {
-        path: '/tmp/example.ts',
-        content: 'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;',
-      },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true, quietPreviewLineLimit: 3 },
-      ui,
-    );
-
-    const lines = component.render(100).map(stripAnsi);
-    expect(lines).toHaveLength(5);
-    expect(lines.join('\n')).not.toContain('const first = 1;');
-    expect(lines.join('\n')).toContain('const second = 2;');
-    expect(lines.join('\n')).toContain('const third = 3;');
-    expect(lines.join('\n')).toContain('const fourth = 4;');
-    expect(lines[4]).toContain('╰──');
-  });
-
-  it('rolls long quiet write previews through two detail lines by default', () => {
-    const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      {
-        path: '/tmp/example.ts',
-        content:
-          'const first = 1;\nconst second = 2;\nconst third = 3;\nconst fourth = 4;\nconst fifth = 5;\nconst sixth = 6;\nconst seventh = 7;\nconst eighth = 8;\nconst ninth = 9;',
-      },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true },
-      ui,
-    );
-
-    const lines = component.render(74);
-    expect(lines).toHaveLength(4);
-    expect(stripAnsi(lines[3]!)).toContain('╰──');
-    const visible = stripAnsi(lines.join('\n'));
-    expect(visible).not.toContain('const first = 1');
-    expect(visible).toContain('const eighth = 8;');
-    expect(visible).toContain('const ninth = 9;');
-  });
-
-  it('shows previews on grouped quiet write continuations', () => {
-    const first = new ToolExecutionComponentEnhanced(
-      'write_file',
-      { path: '/tmp/a.ts', content: 'const first = 1;' },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true },
-      ui,
-    );
-    const second = new ToolExecutionComponentEnhanced(
       'write_file',
       { path: '/tmp/b.ts', content: 'const second = 2;\nconst third = 3;' },
       { quietDisplayMode: 'quiet', collapsedByDefault: true },
       ui,
     );
 
-    second.setCompactToolContinuation(true, '/tmp/a.ts');
-    const lines = second.render(100);
-    expect(lines).toHaveLength(4);
-    expect(stripAnsi(lines[0]!)).toContain('●─');
-    expect(stripAnsi(lines[1]!)).toContain('const second = 2;');
-    expect(stripAnsi(lines[2]!)).toContain('const third = 3;');
-    expect(stripAnsi(lines[3]!)).toContain('╰──');
-    expect(stripAnsi(first.render(100).join('\n'))).toContain('const first = 1;');
-  });
-
-  it('uses a closed continuation header when preview lines are disabled', () => {
-    const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      { path: '/tmp/a.ts', content: 'const first = 1;' },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true, quietPreviewLineLimit: 0 },
-      ui,
-    );
-
-    component.setCompactToolContinuation(true, '/tmp/previous.ts');
+    component.setCompactToolContinuation(true, '/tmp/a.ts');
     const lines = component.render(100).map(stripAnsi);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('╰─');
-    expect(lines[0]).not.toContain('●─');
-  });
-
-  it('does not use orange dot continuation markers when preview lines are disabled', () => {
-    const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      { path: '/tmp/a.ts', content: 'const first = 1;' },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true, quietPreviewLineLimit: 0 },
-      ui,
-    );
-
-    component.setCompactToolContinuation(true, '/tmp/previous.ts');
-    component.setCompactToolHasFollowingContinuation(true);
-    const lines = component.render(100).map(stripAnsi);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain('├─');
-    expect(lines[0]).not.toContain('●─');
-  });
-
-  it('uses an open continuation header when the continuation has preview lines', () => {
-    const component = new ToolExecutionComponentEnhanced(
-      'write_file',
-      { path: '/tmp/a.ts', content: 'const first = 1;\nconst second = 2;' },
-      { quietDisplayMode: 'quiet', collapsedByDefault: true },
-      ui,
-    );
-
-    component.setCompactToolHasFollowingContinuation(true);
-    component.updateResult({ content: [{ type: 'text', text: 'done' }], isError: false });
-    const lines = component.render(100).map(stripAnsi);
-    expect(lines).toHaveLength(4);
-    expect(lines[1]).toContain('│ const first = 1;');
-    expect(lines[2]).toContain('│ const second = 2;');
-    expect(lines[3]).toContain('│');
-    expect(lines.join('\n')).not.toContain('╰─');
+    expect(lines[0]).toContain('/b.ts');
+    expect(lines[0]).not.toContain('const second');
+    expect(component.hasQuietStreamingPreview()).toBe(false);
   });
 
   it('keeps quiet grep pattern, path, and result count on one compact line', () => {
@@ -846,7 +699,7 @@ Test plan:
     expect(boxLines.every(line => /[╮│╯]$/.test(stripAnsi(line).trimEnd()))).toBe(true);
   });
 
-  it('keeps quiet detail lines visible after completion', () => {
+  it('keeps quiet writes compact after completion', () => {
     const component = new ToolExecutionComponentEnhanced(
       'write_file',
       {},
@@ -855,12 +708,12 @@ Test plan:
     );
     component.updateArgs({ path: 'src/example.ts', content: 'first line\nsecond line' });
 
-    expect(component.render(100)).toHaveLength(4);
+    expect(component.render(100)).toHaveLength(1);
 
     component.updateResult({ content: [{ type: 'text', text: 'done' }], isError: false }, false);
-    const lines = component.render(100);
-    expect(lines).toHaveLength(4);
-    expect(lines[1]).toContain('│');
+    const visible = stripAnsi(component.render(100).join('\n'));
+    expect(visible.split('\n')).toHaveLength(1);
+    expect(visible).not.toContain('first line');
   });
 
   it('does not add a preview line to quiet shell tools and keeps the prompt orange', () => {
@@ -1001,7 +854,8 @@ Test plan:
 
     const visible = stripAnsi(second.render(100).join('\n'));
     expect(visible).toContain('src/example.ts');
-    expect(visible).toMatch(/●─+ \/src\/example\.ts/);
+    expect(visible).toContain('╰─ …/src/example.ts');
+    expect(visible).not.toMatch(/─{4,}/);
     expect(visible).not.toMatch(/^\s*[●├─ ]+$/m);
 
     second.updateResult(
@@ -1014,7 +868,8 @@ Test plan:
     second.setCompactToolContinuation(true, 'packages/app/src/example.ts:4-4');
     const completedVisible = stripAnsi(second.render(100).join('\n'));
     expect(completedVisible).toContain('src/example.ts:8-8');
-    expect(completedVisible).toMatch(/╰─+ \/src\/example\.ts:8-8/);
+    expect(completedVisible).toContain('╰─ …/src/example.ts:8-8');
+    expect(completedVisible).not.toMatch(/─{4,}/);
   });
 
   it('keeps same-file continuation connector geometry when both edits have line ranges', () => {
@@ -1046,7 +901,8 @@ Test plan:
 
     const visible = stripAnsi(component.render(220).join('\n'));
     expect(visible).toContain('/components/payment-metho');
-    expect(visible).toMatch(/╰─+ \/components\/payment-metho/);
+    expect(visible).toContain('╰─ …/components/payment-metho');
+    expect(visible).not.toMatch(/─{4,}/);
   });
 
   it('renders standalone incomplete continuations with a tool label instead of a blank call', () => {
@@ -1209,7 +1065,7 @@ Test plan:
     expect(visible).toContain('count: 2');
   });
 
-  it('uses the active continuation dot while a continuation is still streaming', () => {
+  it('uses the compact continuation branch while args are still streaming', () => {
     const component = new ToolExecutionComponentEnhanced(
       'write_file',
       { path: 'src/example.ts' },
@@ -1219,8 +1075,8 @@ Test plan:
     component.setCompactToolContinuation(true, 'src/other.ts');
 
     const visible = stripAnsi(component.render(120).join('\n'));
-    expect(visible).toContain('●─');
-    expect(visible).not.toContain('╰─');
+    expect(visible).toContain('╰─');
+    expect(visible).not.toContain('●─');
   });
 
   it('renders deliberate browser skill workspace and process summaries', () => {

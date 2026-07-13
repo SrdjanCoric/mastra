@@ -56,26 +56,6 @@ function normalizeHexColor(color: string | undefined): string | undefined {
   return color;
 }
 
-const QUIET_CODE_HIGHLIGHT_THEME: HighlightTheme = {
-  default: chalk.hex('#b4b4bd'),
-  keyword: chalk.hex('#c4b5fd'),
-  built_in: chalk.hex('#93c5fd'),
-  type: chalk.hex('#93c5fd'),
-  literal: chalk.hex('#fca5a5'),
-  number: chalk.hex('#fbbf24'),
-  string: chalk.hex('#9ecfa9'),
-  regexp: chalk.hex('#fca5a5'),
-  title: chalk.hex('#93c5fd'),
-  function: chalk.hex('#7dd3fc'),
-  params: chalk.hex('#b4b4bd'),
-  comment: chalk.hex('#71717a'),
-  meta: chalk.hex('#71717a'),
-  attr: chalk.hex('#fbbf24'),
-  variable: chalk.hex('#d4d4d8'),
-  tag: chalk.hex('#c4b5fd'),
-  name: chalk.hex('#c4b5fd'),
-};
-
 const SHELL_CONTROL_WORDS = new Set([
   'if',
   'then',
@@ -517,10 +497,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     const preview = this.getQuietActivePreview();
     if (!preview) return [];
 
-    if (this.isQuietCodePreviewTool()) {
-      return this.getQuietCodePreviewLines(preview, maxLineWidth);
-    }
-
     const firstLineWidth = Math.max(10, maxLineWidth - 4);
     const continuationWidth = Math.max(10, maxLineWidth - 4);
     const wrapped = this.wrapPreviewLines(preview, firstLineWidth, continuationWidth).slice(
@@ -531,22 +507,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
       const linePrefix = `  ${chalk.hex(this.getQuietToolRailColor())('│')} `;
       return truncateAnsi(`${linePrefix}${this.formatQuietActivePreview(line)}`, maxLineWidth);
     });
-  }
-
-  private getQuietCodePreviewLines(preview: string, maxLineWidth: number): string[] {
-    const linePrefix = `  ${chalk.hex(this.getQuietToolRailColor())('│')} `;
-    return this.highlightQuietCodePreview(preview)
-      .split('\n')
-      .slice(-this.quietPreviewLineLimit)
-      .map(line => truncateAnsi(`${linePrefix}${line}`, maxLineWidth));
-  }
-
-  private isQuietCodePreviewTool(): boolean {
-    return (
-      this.toolName === MC_TOOLS.VIEW ||
-      this.toolName === MC_TOOLS.WRITE_FILE ||
-      this.toolName === MC_TOOLS.STRING_REPLACE_LSP
-    );
   }
 
   private getQuietPreviewCapLine(): string {
@@ -567,19 +527,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     }
 
     return theme.fg('text', preview);
-  }
-
-  private highlightQuietCodePreview(preview: string): string {
-    const path = this.getFirstStringArg('path');
-    try {
-      return highlight(preview, {
-        language: getLanguageFromPath(path),
-        ignoreIllegals: true,
-        theme: QUIET_CODE_HIGHLIGHT_THEME,
-      });
-    } catch {
-      return theme.fg('toolArgs', preview);
-    }
   }
 
   private tokenizeQuietShellCommand(command: string): Array<{ text: string; color: (value: string) => string }> {
@@ -799,12 +746,8 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     if (this.toolName === MC_TOOLS.FILE_STAT) return this.formatQuietFileStatPreview();
 
     switch (this.toolName) {
-      case MC_TOOLS.VIEW:
-        return this.formatQuietViewPreview();
       case 'skill':
         return '';
-      case MC_TOOLS.WRITE_FILE:
-        return this.getMultilinePreview('content', Number.POSITIVE_INFINITY, false);
       case MC_TOOLS.LSP_INSPECT:
         return this.getFirstLineArg('match', 80);
       default:
@@ -814,6 +757,8 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
 
   private usesCompactActivityOnly(): boolean {
     return (
+      this.toolName === MC_TOOLS.VIEW ||
+      this.toolName === MC_TOOLS.WRITE_FILE ||
       this.toolName === MC_TOOLS.STRING_REPLACE_LSP ||
       this.toolName === MC_TOOLS.AST_SMART_EDIT ||
       this.toolName === MC_TOOLS.SEARCH_CONTENT ||
@@ -830,18 +775,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
       return outputLines.join(' — ');
     }
     return outputLines.slice(0, 2).join('\n');
-  }
-
-  private formatQuietViewPreview(): string {
-    if (!this.result) return '';
-
-    const output = this.getFormattedOutput();
-    if (!output || !this.looksLikeViewOutput(output)) return '';
-
-    const argsObj = this.args as Record<string, unknown> | undefined;
-    const viewRange = argsObj?.view_range as [number, number] | undefined;
-    const startLine = viewRange?.[0] ?? (argsObj?.offset as number | undefined) ?? 1;
-    return getPlainCodeFromViewOutput(output, startLine);
   }
 
   private formatQuietWebSearchPreview(): string {
@@ -967,23 +900,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
       .filter(line => line.trim() !== '' && line.trim() !== '.');
   }
 
-  private looksLikeViewOutput(output: string): boolean {
-    return output.split('\n').some(line => /^\s*\d+[\t→]/.test(line));
-  }
-
-  private getMultilinePreview(key: string, maxLength = 80, includeLineCount = true): string {
-    const value = this.getFirstStringArg(key);
-    if (!value) return '';
-
-    const lines = value.split('\n');
-    const previewText = includeLineCount ? (lines[0] ?? '') : value.replace(/\r\n/g, '\n').replace(/^\n+|\n+$/g, '');
-    const truncated =
-      Number.isFinite(maxLength) && previewText.length > maxLength
-        ? `${previewText.slice(0, maxLength)}…`
-        : previewText;
-    return includeLineCount && lines.length > 1 ? `${truncated} (${lines.length} lines)` : truncated;
-  }
-
   private stripAnsi(value: string): string {
     return value.replace(/\x1b\[[0-9;]*m/g, '');
   }
@@ -1003,9 +919,6 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
   }
 
   private formatCompactContinuationLine(summary: string): string {
-    const lineMatch = summary.match(/^─+/);
-    const linePrefix = lineMatch?.[0] ?? '';
-    const separator = linePrefix ? '' : ' ';
     const hasFollowing = this.compactToolHasFollowingContinuation || this.hasQuietStreamingPreview();
     const hasPreview = this.hasQuietStreamingPreview();
     const toolLabelColor = this.getCompactToolLabelColor();
@@ -1014,13 +927,12 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     const argsColor = this.getCompactToolArgsColor(toolLabelColor);
     const railColor = this.getQuietToolRailColor();
     const circleColor = this.getQuietToolCircleColor(color);
-    const isStreamingContinuation =
-      this.compactToolContinuation && !this.isComplete() && this.quietPreviewLineLimit > 0;
+    const isStreamingContinuation = this.compactToolContinuation && !this.isComplete() && hasPreview;
     const branch =
       hasFollowing || isStreamingContinuation
-        ? `${hasPreview || isStreamingContinuation ? chalk.hex(circleColor)('●') : chalk.hex(railColor)('├')}${chalk.hex(railColor)(`─${separator}${linePrefix}`)}`
-        : chalk.hex(railColor)(`╰─${separator}${linePrefix}`);
-    const continuationSummary = ` ${summary.slice(linePrefix.length)}`;
+        ? `${hasPreview || isStreamingContinuation ? chalk.hex(circleColor)('●') : chalk.hex(railColor)('├')}${chalk.hex(railColor)('─')}`
+        : chalk.hex(railColor)('╰─');
+    const continuationSummary = ` ${summary}`;
     const trail = continuationSummary ? chalk.hex(argsBg)('▌') : '';
     return `${branch}${this.formatCompactSummaryBadge(continuationSummary, argsBg, argsColor)}${trail}`;
   }
@@ -1078,10 +990,7 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
 
   private formatSharedPrefixPlaceholder(summary: string, sharedPrefixLength: number): string {
     if (sharedPrefixLength <= 0) return '';
-    if (summary[sharedPrefixLength - 1] === '/') {
-      return `${'─'.repeat(sharedPrefixLength)}/`;
-    }
-    return '─'.repeat(sharedPrefixLength + 1);
+    return summary[sharedPrefixLength - 1] === '/' ? '…/' : '…';
   }
 
   private getSharedPrefixLength(a: string, b: string): number {
