@@ -58,3 +58,4 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0023 · Show managed workflows as unlimited (after 0022) → tasks/done/0023-show-managed-workflows-as-unlimited.md
 - [x] 0024 · Prepare MastraCode Remote 0.2.5 (after 0023) → tasks/done/0024-release-mastracode-remote-0.2.5.md
 - [x] 0025 · Remove partial-code preview rendering (after 0024) → tasks/done/0025-remove-partial-code-preview-rendering.md
+- [x] 0026 · Normalize compact tool paths (after 0025) → tasks/done/0026-normalize-compact-tool-paths.md

@@ -87,6 +87,48 @@ describe('ToolExecutionComponentEnhanced quiet display', () => {
     expect(output.split('\n')).toHaveLength(1);
   });
 
+  it('renders absolute view paths relative to the terminal working directory', () => {
+    const component = new ToolExecutionComponentEnhanced(
+      'view',
+      { path: `${process.cwd()}/src/example.ts`, offset: 10, limit: 5 },
+      { quietDisplayMode: 'quiet', collapsedByDefault: true },
+      ui,
+    );
+
+    const visible = stripAnsi(component.render(100).join('\n'));
+    expect(visible).toContain('src/example.ts:10-14');
+    expect(visible).not.toContain(process.cwd());
+  });
+
+  it('renders sibling-project absolute paths relative to the terminal working directory', () => {
+    const component = new ToolExecutionComponentEnhanced(
+      'view',
+      { path: `${process.cwd()}/../sibling/src/example.ts`, offset: 1, limit: 3 },
+      { quietDisplayMode: 'quiet', collapsedByDefault: true },
+      ui,
+    );
+
+    const visible = stripAnsi(component.render(100).join('\n'));
+    expect(visible).toContain('../sibling/src/example.ts:1-3');
+    expect(visible).not.toContain(process.cwd());
+  });
+
+  it.each(['write_file', 'search_content', 'find_files', 'file_stat', 'delete_file', 'mkdir', 'ast_smart_edit'])(
+    'renders absolute %s paths relative to the terminal working directory',
+    toolName => {
+      const component = new ToolExecutionComponentEnhanced(
+        toolName,
+        { path: `${process.cwd()}/src/example.ts`, pattern: 'example' },
+        { quietDisplayMode: 'quiet', collapsedByDefault: true },
+        ui,
+      );
+
+      const visible = stripAnsi(component.render(100).join('\n'));
+      expect(visible).toContain('src/example.ts');
+      expect(visible).not.toContain(process.cwd());
+    },
+  );
+
   it('does not process or render large quiet view results as source previews', () => {
     const component = new ToolExecutionComponentEnhanced(
       'view',
