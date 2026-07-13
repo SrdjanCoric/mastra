@@ -84,12 +84,12 @@ values
 
     terminal.submit('Render quiet mode live tool output.');
     await runtime.waitForScreenText(/▐view▌src\/quiet-mode-e2e\.ts/i, terminal, 12_000);
-    await runtime.waitForScreenText(/QUIET_MODE_LOADED_PREVIEW/i, terminal, 12_000);
     await runtime.waitForScreenText(/▐edit▌src\/quiet-mode-e2e\.ts/i, terminal, 12_000);
     await runtime.waitForScreenText(/▐grep▌"QUIET_MODE" · src\/quiet-mode-e2e\.ts/i, terminal, 12_000);
     await runtime.waitForScreenText(/▐list▌"\*\*\/\*\.ts" · src/i, terminal, 12_000);
     await runtime.waitForScreenText(/0\/1\s+.*Verify quiet live task summary/i, terminal, 12_000);
     await runtime.waitForScreenText(/Quiet live tool output complete\./i, terminal, 12_000);
+    expect(terminal.serialize().view).not.toContain('QUIET_MODE_LOADED_PREVIEW');
     expect(terminal.serialize().view).not.toContain('COMPACT_EDIT_SOURCE_MUST_STAY_HIDDEN');
     runtime.printScreen('quiet live tool output', terminal);
 
@@ -102,8 +102,8 @@ values
     await runtime.waitForScreenText(/Switched to: E2E quiet loaded history fixture/i, terminal, 8_000);
     await runtime.waitForScreenText(/Quiet loaded history answer begins/i, terminal, 8_000);
     await runtime.waitForScreenText(/▐view▌src\/quiet-mode-e2e\.ts/i, terminal, 8_000);
-    await runtime.waitForScreenText(/QUIET_MODE_LOADED_PREVIEW/i, terminal, 8_000);
     await runtime.waitForScreenText(/Quiet loaded history answer complete/i, terminal, 8_000);
+    expect(terminal.serialize().view).not.toContain('QUIET_MODE_LOADED_PREVIEW');
     runtime.printScreen('quiet loaded tool history', terminal);
 
     terminal.keyCtrlC();

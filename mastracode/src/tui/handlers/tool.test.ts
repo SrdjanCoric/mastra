@@ -131,7 +131,8 @@ describe('task tool rendering', () => {
     const output = stripAnsi(ctx.state.chatContainer.render(120).join('\n'));
     expect(output).toContain('view');
     expect(output).toContain('src/example.ts:80-169');
-    expect(output).toContain('●───── /example.ts:1-25▌');
+    expect(output).toContain('╰─ …/example.ts:1-25▌');
+    expect(output).not.toMatch(/─{4,}/);
   });
 
   it('streams submit_plan args into a plan box instead of rendering a generic tool', () => {
