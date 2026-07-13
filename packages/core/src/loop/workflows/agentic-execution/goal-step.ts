@@ -290,7 +290,9 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
             typeof goal.tools === 'function'
               ? ((await (goal.tools as (args: any) => unknown)({ requestContext, mastra })) as ToolsInput | undefined)
               : goal.tools;
-          const goalId = record.id ?? `${threadId}:${record.startedAt}`;
+          // Keep the default judge stateless. The prompt already contains the
+          // current parent-thread context; judge memory would replay prior
+          // evaluations and grow the model input on every goal run.
           scorer = createGoalScorer({
             mastra,
             judgeModel,
@@ -299,24 +301,6 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
             requestContext,
             onStream: observeJudgeStream,
             ...(effective.maxSteps ? { maxSteps: effective.maxSteps } : {}),
-            ...(_internal?.memory
-              ? {
-                  memory: _internal.memory,
-                  defaultMemoryOptions: {
-                    thread: {
-                      id: `${threadId ?? 'no-thread'}-${goalId}`,
-                      title: `Goal judge: ${record.objective.slice(0, 80)}`,
-                      metadata: {
-                        forkedSubagent: true,
-                        goalJudge: true,
-                        parentThreadId: threadId,
-                        goalId,
-                      },
-                    },
-                    ...(_internal.resourceId ? { resource: _internal.resourceId } : {}),
-                  },
-                }
-              : {}),
           });
         }
 
