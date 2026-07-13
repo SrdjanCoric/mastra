@@ -4,6 +4,7 @@
  */
 
 import * as os from 'node:os';
+import * as pathModule from 'node:path';
 import { Box, Container, Spacer, Text, visibleWidth } from '@earendil-works/pi-tui';
 import type { TUI } from '@earendil-works/pi-tui';
 import type { TaskItemInput } from '@mastra/core/signals';
@@ -82,14 +83,15 @@ export interface ToolExecutionOptions {
   compactToolModeColor?: string;
 }
 /**
- * Convert absolute path to tilde notation if it's in home directory
+ * Keep displayed paths compact while preserving the original path for tool execution and file links.
  */
 function shortenPath(path: string): string {
+  if (!pathModule.isAbsolute(path)) return path;
+
+  const cwdRelative = pathModule.relative(process.cwd(), path) || '.';
   const home = os.homedir();
-  if (path.startsWith(home)) {
-    return `~${path.slice(home.length)}`;
-  }
-  return path;
+  const homeRelative = path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+  return cwdRelative.length <= homeRelative.length ? cwdRelative : homeRelative;
 }
 
 /**
@@ -1035,15 +1037,15 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
       case MC_TOOLS.STRING_REPLACE_LSP:
         return this.formatEditSummary();
       case MC_TOOLS.WRITE_FILE:
-        return this.getFirstStringArg('path');
+        return this.formatPathArg();
       case MC_TOOLS.FIND_FILES:
         return this.formatListSummary();
       case MC_TOOLS.DELETE_FILE:
       case MC_TOOLS.FILE_STAT:
       case MC_TOOLS.MKDIR:
-        return this.getFirstStringArg('path');
+        return this.formatPathArg();
       case MC_TOOLS.AST_SMART_EDIT:
-        return this.getFirstStringArg('path') || this.getFirstStringArg('targetName');
+        return this.formatPathArg() || this.getFirstStringArg('targetName');
       case MC_TOOLS.SEARCH_CONTENT:
         return this.formatSearchSummary();
       case MC_TOOLS.LSP_INSPECT:
@@ -1091,6 +1093,11 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     }
   }
 
+  private formatPathArg(): string {
+    const path = this.getFirstStringArg('path');
+    return path ? shortenPath(path) : '';
+  }
+
   private formatPathWithRange(): string {
     const rawPath = this.getFirstStringArg('path');
     if (!rawPath) return '';
@@ -1102,25 +1109,26 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
     const line = typeof argsObj?.line === 'number' ? argsObj.line : undefined;
     const start = viewRange?.[0] ?? offset ?? line;
     const end = viewRange?.[1] ?? (offset !== undefined && limit !== undefined ? offset + limit - 1 : line);
-    const path = rawPath;
+    const path = shortenPath(rawPath);
 
     if (start === undefined) return path;
     return end !== undefined && end !== start ? `${path}:${start}-${end}` : `${path}:${start}`;
   }
 
   private formatEditSummary(): string {
-    const path = this.getFirstStringArg('path');
-    if (!path) return '';
+    const rawPath = this.getFirstStringArg('path');
+    if (!rawPath) return '';
 
     const output = this.getFormattedOutput();
-    const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedPath = rawPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const match = output.match(new RegExp(`Replaced \\d+ occurrences? in ${escapedPath} \\(lines ([^)]+)\\)`));
+    const path = shortenPath(rawPath);
     return match?.[1] ? `${path}:${match[1]}` : path;
   }
 
   private formatListSummary(): string {
     const pattern = this.formatPatternArg('pattern');
-    const path = this.getFirstStringArg('path') || '.';
+    const path = this.formatPathArg() || '.';
     const target = [pattern, path].filter(Boolean).join(' · ');
     const resultCount = this.result ? this.getListResultEntries().length : undefined;
     if (resultCount === undefined) return target;
@@ -1129,7 +1137,7 @@ export class ToolExecutionComponentEnhanced extends Container implements IToolEx
 
   private formatSearchSummary(): string {
     const pattern = this.formatPatternArg('pattern');
-    const path = this.getFirstStringArg('path') || '.';
+    const path = this.formatPathArg() || '.';
     const target = [pattern, path].filter(Boolean).join(' · ');
     const resultCount = this.getSearchResultCount();
     return resultCount === undefined
