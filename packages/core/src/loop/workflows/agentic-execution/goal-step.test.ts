@@ -170,7 +170,7 @@ async function runGoalStep(
 }
 
 describe('goal step waiting semantics', () => {
-  it('uses the original MastraCode judge prompt shape and memory thread id', async () => {
+  it('uses current parent-thread context without accumulating a judge memory thread', async () => {
     const streamSpy = vi.spyOn(Agent.prototype, 'stream').mockResolvedValue({
       object: Promise.resolve({ decision: 'continue', reason: 'need another fact' }),
     } as any);
@@ -189,15 +189,24 @@ describe('goal step waiting semantics', () => {
         ],
       });
 
-      const [prompt, options] = (streamSpy.mock.calls[0] ?? []) as any[];
+      await runGoalStep('continue', makeRecord({ id: 'goal-1', runsUsed: 1 }), {
+        useMemory: true,
+        dbMessages: [
+          {
+            role: 'user',
+            content: [{ type: 'text', text: 'Continue with the next workflow task.' }],
+          },
+        ],
+      });
+
+      const [prompt, firstOptions] = streamSpy.mock.calls[0] ?? [];
+      const [, secondOptions] = streamSpy.mock.calls[1] ?? [];
       expect(prompt).toBe(
         'Goal: implement X, then stop and wait for my review\n\nLatest user message:\nPlease continue after answering this.\n\nLatest user delivery: unspecified\n\nAssistant steps since that user message: 1\n\nLatest assistant message:\nI did X',
       );
-      expect(options?.memory?.thread).toEqual({
-        id: 'thread-1-goal-1',
-        title: 'Goal judge: implement X, then stop and wait for my review',
-        metadata: { forkedSubagent: true, goalJudge: true, parentThreadId: THREAD_ID, goalId: 'goal-1' },
-      });
+      expect(streamSpy).toHaveBeenCalledTimes(2);
+      expect(firstOptions?.memory).toBeUndefined();
+      expect(secondOptions?.memory).toBeUndefined();
     } finally {
       streamSpy.mockRestore();
     }
