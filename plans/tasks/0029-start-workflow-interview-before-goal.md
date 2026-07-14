@@ -10,8 +10,6 @@ Handle bare `mastra workflow` at the TUI input boundary before any model request
 
 If the user chooses a new feature, collect the feature in the TUI first and only then start the model-backed `mastra-talk-it-through` interview. If they choose the existing plan, start the same unlimited managed goal used by `mastra workflow --run`.
 
-Goal accounting must also distinguish autonomous work from interaction: a judge decision that the goal is waiting for required user input stops the loop without consuming a run.
-
 ## Acceptance criteria
 
 - [x] Bare `mastra workflow` displays the native startup choice before any model request.
@@ -20,7 +18,6 @@ Goal accounting must also distinguish autonomous work from interaction: a judge 
 - [x] Choosing a new feature collects the feature before starting the model-backed interview.
 - [x] `mastra workflow --run` still starts the persistent unlimited goal directly.
 - [x] Telegram input keeps its existing text routing and does not open a terminal modal.
-- [x] A goal waiting on a required talk-it-through question or human checkpoint does not increment `runsUsed`.
 - [x] Unit, in-process TUI, and real PTY boundary coverage prove the startup choice appears without an AIMock request.
 
 ## Diagnosis evidence
@@ -39,7 +36,6 @@ Goal accounting must also distinguish autonomous work from interaction: a judge 
 - Terminal and Telegram input keep their shared-session behavior. If Telegram starts a run while the terminal choice or prompt hook is open, the selected goal or interview joins that active run through the existing signal path.
 - The packaged workflow skill documents the same startup split as a fallback for non-TUI invocation paths.
 - The in-process e2e harness can now explicitly assert that a selected model produced zero AIMock requests for a local-only interaction.
-- Goal accounting keeps a waiting objective active, stops automatic continuation, and leaves its run count unchanged. Managed workflow goals remain unbounded.
 
 ## Verification evidence
 
@@ -47,6 +43,5 @@ Goal accounting must also distinguish autonomous work from interaction: a judge 
 - The checked-in in-process `managed-workflow-interview-startup` scenario shows both options within two seconds and verifies zero AIMock requests.
 - The checked-in in-process `managed-workflow-interview-dispatch` scenario selects the new-feature path and verifies that the first model request contains the activated `mastra-talk-it-through` skill and the collected feature.
 - The checked-in real PTY regression launches built `dist/cli.js`, submits bare `mastra workflow`, sees both options within two seconds, and verifies the mock provider received zero requests.
-- Focused goal-step coverage passes at 20/20 and proves that waiting blocks continuation without consuming a run.
-- Targeted ESLint and Prettier checks pass for the changed code and prose. MastraCode's TypeScript check, package-local build, and the `@mastra/core` package check also pass.
+- Targeted ESLint and Prettier checks pass for the changed code and prose. MastraCode's TypeScript check and package-local build also pass.
 - The repository-wide MastraCode dependency-graph build is unavailable in this working tree because unrelated, pre-existing deletions removed the deployer build sources. The package-local build and task-focused checks do not depend on those deleted files.
