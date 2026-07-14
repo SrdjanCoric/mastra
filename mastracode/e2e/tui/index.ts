@@ -48,6 +48,8 @@ import { integrationCommandsScenario } from './integration-commands.js';
 import { lifecycleHooksConfiguredScenario } from './lifecycle-hooks-configured.js';
 import { lifecycleHooksEventsScenario } from './lifecycle-hooks-events.js';
 import { loginDialogMaskedInputScenario } from './login-dialog-masked-input.js';
+import { managedWorkflowInterviewDispatchScenario } from './managed-workflow-interview-dispatch.js';
+import { managedWorkflowInterviewStartupScenario } from './managed-workflow-interview-startup.js';
 import { mcpHttpToolCallScenario } from './mcp-http-tool-call.js';
 import { mcpLongRunningToolScenario } from './mcp-long-running-tool.js';
 import { mcpReloadConfigScenario } from './mcp-reload-config.js';
@@ -203,6 +205,8 @@ export const scenarios: Record<ScenarioName, McE2eScenario> = {
   'lifecycle-hooks-configured': lifecycleHooksConfiguredScenario,
   'lifecycle-hooks-events': lifecycleHooksEventsScenario,
   'login-dialog-masked-input': loginDialogMaskedInputScenario,
+  'managed-workflow-interview-dispatch': managedWorkflowInterviewDispatchScenario,
+  'managed-workflow-interview-startup': managedWorkflowInterviewStartupScenario,
   'modal-and-shell': modalAndShellScenario,
   'mcp-http-tool-call': mcpHttpToolCallScenario,
   'mcp-long-running-tool': mcpLongRunningToolScenario,

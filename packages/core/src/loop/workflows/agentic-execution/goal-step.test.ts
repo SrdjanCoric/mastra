@@ -258,9 +258,11 @@ describe('goal step waiting semantics', () => {
     const { chunk, record, stepResult } = await runGoalStep('waiting', makeRecord());
 
     // The record stays active — the goal is still eligible for judging on the
-    // next agent turn. Only the auto-loop stops.
+    // next agent turn. Waiting for required user input is not autonomous work,
+    // so it must not consume a run.
     expect(record.status).toBe('active');
-    expect(record.runsUsed).toBe(1);
+    expect(record.runsUsed).toBe(0);
+    expect(chunk.payload.iteration).toBe(0);
     // Waiting must stop the loop, not iterate.
     expect(stepResult.isContinued).toBe(false);
     // The chunk reflects active status with the waitingForUser flag.

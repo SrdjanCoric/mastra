@@ -220,7 +220,7 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
             from: ChunkFrom.AGENT,
             payload: {
               objective: record.objective,
-              iteration: record.runsUsed + 1,
+              iteration: evaluation,
               maxRuns: effective.maxRuns,
               unbounded: effective.unbounded,
               passed: false,
@@ -398,8 +398,9 @@ export function createGoalStep<Tools extends ToolSet = ToolSet, OUTPUT = undefin
 
       // Increment runs and update status. A while-active user interjection is
       // answered inside the current goal but does not consume autonomous-work
-      // budget. Unbounded goals never stop on a run count.
-      const runsUsed = evaluation;
+      // budget. Waiting stops the loop without consuming a run; managed workflow
+      // goals are unbounded and never stop on a run count.
+      const runsUsed = waiting ? record.runsUsed : evaluation;
       const maxRunsReached = !effective.unbounded && runsUsed >= effective.maxRuns;
       let status: GoalObjectiveRecord['status'] = record.status;
       let pausedReason: string | undefined;

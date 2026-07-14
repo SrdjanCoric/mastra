@@ -46,6 +46,7 @@ import {
 import { insertChatComponentWithBoundarySpacing } from './chat-boundary-reconciliation.js';
 import { dispatchSlashCommand } from './command-dispatch.js';
 import { startGoalWithDefaults, startManagedWorkflowGoal } from './commands/goal.js';
+import { handleSkillCommand } from './commands/skills.js';
 
 import type { SlashCommandContext } from './commands/types.js';
 import { AskQuestionInlineComponent } from './components/ask-question-inline.js';
@@ -62,7 +63,7 @@ import type { EventHandlerContext } from './handlers/types.js';
 import { InteractivePromptBridge } from './interactive-prompt-bridge.js';
 import { InterjectionReplyTracker, shouldSendAssistantReplyToTelegram } from './interjection-reply-tracker.js';
 import type { InterjectionReplyOrigin } from './interjection-reply-tracker.js';
-import { parseManagedWorkflowGoal } from './managed-workflow-goal.js';
+import { isManagedWorkflowPrompt, parseManagedWorkflowGoal } from './managed-workflow-goal.js';
 import { askModalQuestion } from './modal-question.js';
 import { showModalOverlay } from './overlay.js';
 import { promptForApiKeyIfNeeded } from './prompt-api-key.js';
@@ -514,8 +515,9 @@ export class MastraTUI {
     content: string,
     options?: { label?: string; onRejected?: () => void },
   ): Promise<boolean> {
-    const objective = parseManagedWorkflowGoal(content);
-    if (!objective || this.state.session.run.isRunning()) return false;
+    let objective = parseManagedWorkflowGoal(content);
+    const shouldChooseMode = !options?.label && isManagedWorkflowPrompt(content);
+    if ((!objective && !shouldChooseMode) || this.state.session.run.isRunning()) return false;
 
     if (!this.state.session.model.hasSelection()) {
       showInfo(this.state, 'No model selected. Use /models to select a model, or /login to authenticate.');
@@ -523,11 +525,48 @@ export class MastraTUI {
       return true;
     }
 
+    if (shouldChooseMode) {
+      const mode = await askModalQuestion(this.state.ui, {
+        question: 'What would you like Mastra workflow to do?',
+        options: [
+          {
+            label: 'Run existing plan',
+            description: 'Continue the tasks already listed in plans/PLAN.md.',
+          },
+          {
+            label: 'Plan a new feature',
+            description: 'Start a guided interview, then add tasks to the plan.',
+          },
+        ],
+        selectedOptionLabel: 'Run existing plan',
+      });
+      if (!mode) return true;
+
+      if (mode === 'Plan a new feature') {
+        const feature = await askModalQuestion(this.state.ui, {
+          question: 'What feature do you want to plan?',
+        });
+        if (!feature?.trim()) return true;
+
+        const featurePrompt = `/skill/mastra-talk-it-through ${feature.trim()}`;
+        if (!(await this.runUserPromptHook(featurePrompt))) {
+          options?.onRejected?.();
+          return true;
+        }
+        await handleSkillCommand(this.buildCommandContext(), 'mastra-talk-it-through', [feature.trim()]);
+        return true;
+      }
+
+      if (mode !== 'Run existing plan') return true;
+      objective = 'mastra workflow --run';
+    }
+    if (!objective) return false;
+
     const messageId = `user-${Date.now()}`;
     addUserMessage(this.state, this.createUserSignalMessage(content, undefined, messageId), options);
     this.state.ui.requestRender();
 
-    const allowed = await this.runUserPromptHook(content);
+    const allowed = await this.runUserPromptHook(objective);
     if (!allowed) {
       this.removeOptimisticUserMessage(messageId);
       options?.onRejected?.();

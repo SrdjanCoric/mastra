@@ -77,6 +77,8 @@ export type ScenarioName =
   | 'lifecycle-hooks-configured'
   | 'lifecycle-hooks-events'
   | 'login-dialog-masked-input'
+  | 'managed-workflow-interview-dispatch'
+  | 'managed-workflow-interview-startup'
   | 'modal-and-shell'
   | 'mcp-http-tool-call'
   | 'mcp-long-running-tool'
@@ -207,6 +209,7 @@ export type McE2eScenario = {
   skipReason?: string;
   projectFixture?: 'long-branch' | 'manual';
   useOpenAIModel?: boolean;
+  expectAimockRequests?: boolean;
   disableMemory?: boolean;
   aimockFixture?: string;
   env?: (context: McE2ePrepareContext) => Record<string, string>;

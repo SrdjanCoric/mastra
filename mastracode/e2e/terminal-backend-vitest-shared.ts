@@ -253,7 +253,9 @@ async function runScenarioInProcess(scenario: McE2eScenario): Promise<void> {
     if (status !== 0) throw new Error(`${scenario.name} exited with status ${status}`);
     if (aimock) {
       const requestCount = aimock.requestCount();
-      if (requestCount === 0) throw new Error(`${scenario.name} expected at least one AIMock request but saw none`);
+      if (requestCount === 0 && scenario.expectAimockRequests !== false) {
+        throw new Error(`${scenario.name} expected at least one AIMock request but saw none`);
+      }
       scenario.verifyAimockRequests?.(aimock.requests());
     }
   } finally {

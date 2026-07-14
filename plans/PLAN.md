@@ -61,3 +61,4 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0026 · Normalize compact tool paths (after 0025) → tasks/done/0026-normalize-compact-tool-paths.md
 - [x] 0027 · Send images during active runs (after 0026) → tasks/done/0027-send-images-during-active-runs.md
 - [x] 0028 · Speed up managed workflow judging (after 0027) → tasks/done/0028-speed-up-managed-workflow-judge.md
+- [~] 0029 · Start workflow interview before goal creation (after 0028) → tasks/0029-start-workflow-interview-before-goal.md

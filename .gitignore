@@ -77,3 +77,4 @@ om-reflector-fixture.json
 !.mastracode/shared/pr-review-context.md
 !.mastracode/shared/issue-debug-context.md
 .tmp-mc-e2e-vitest/
+reviews/

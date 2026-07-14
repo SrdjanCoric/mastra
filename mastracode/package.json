@@ -86,7 +86,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "MC_E2E_VITEST_SCENARIOS=telegram-shared-conversation,telegram-recovery,shell-output-batching vitest run --config e2e/vitest.config.ts --reporter=dot",
+    "test:integration": "MC_E2E_VITEST_SCENARIOS=telegram-shared-conversation,telegram-recovery,shell-output-batching vitest run --config e2e/vitest.config.ts --reporter=dot && vitest run --config e2e/pty/vitest.config.ts --reporter=dot",
     "lint": "eslint .",
     "e2e:list": "tsx e2e-list.ts",
     "e2e:smoke": "vitest run --config e2e/vitest.shards.config.ts",
