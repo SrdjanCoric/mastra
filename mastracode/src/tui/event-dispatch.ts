@@ -6,6 +6,7 @@ import type { TaskItemSnapshot } from '@mastra/core/signals';
 import type { AskUserSelectionMode } from '@mastra/core/tools';
 
 import { getCurrentGitBranchAsync } from '../utils/project.js';
+import { THREAD_GOAL_CLEANUP_BLOCKED_KEY } from './goal-manager.js';
 import {
   handleAgentStart,
   handleAgentEnd,
@@ -217,6 +218,7 @@ export async function dispatchEvent(
       if (currentThread) {
         state.currentThreadTitle = currentThread.title;
         const metadata = currentThread.metadata as Record<string, unknown> | undefined;
+        state.goalCleanupBlocked = metadata?.[THREAD_GOAL_CLEANUP_BLOCKED_KEY] === true;
         state.activeGithubPrSubscriptions = getGithubPrSubscriptionsFromMetadata(metadata);
         state.githubPrPollingActive = false;
         state.githubPrGradientAnimator?.stop();

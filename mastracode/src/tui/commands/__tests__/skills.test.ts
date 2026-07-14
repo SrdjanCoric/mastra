@@ -95,7 +95,7 @@ describe('handleSkillCommand', () => {
     (previousComponent as any).getChatSpacingKind = () => 'user-message';
     state.chatContainer.addChild(previousComponent);
 
-    await handleSkillCommand(ctx, 'github-triage', ['focus', 'tests']);
+    const activated = await handleSkillCommand(ctx, 'github-triage', ['focus', 'tests']);
 
     expect(state.allSlashCommandComponents).toHaveLength(1);
     expect(state.chatContainer.children).toHaveLength(3);
@@ -116,6 +116,7 @@ describe('handleSkillCommand', () => {
         '</skill>',
     });
     expect(ctx.showError).not.toHaveBeenCalled();
+    expect(activated).toBe(true);
   });
 
   it('preserves general XML/HTML in skill content but neutralizes the </skill> boundary token', async () => {
@@ -163,10 +164,11 @@ describe('handleSkillCommand', () => {
     };
     const { ctx, controller } = createCtx({ workspace });
 
-    await handleSkillCommand(ctx, 'missing', []);
+    const activated = await handleSkillCommand(ctx, 'missing', []);
 
     expect(controller.session.sendMessage).not.toHaveBeenCalled();
     expect(ctx.showError).toHaveBeenCalledWith('Skill not found: missing. Available skills: review, browse');
+    expect(activated).toBe(false);
   });
 
   it('shows an error when no skills are configured', async () => {

@@ -178,6 +178,53 @@ describe('GoalManager adapter', () => {
     expect(manager.isActive()).toBe(false);
   });
 
+  it('clears the durable objective and quarantine marker before clearing the local goal', async () => {
+    const agent = createAgent();
+    const state = createState(agent);
+    const manager = new GoalManager();
+    await manager.setGoal(state, 'finish the task', '__GATEWAY_OPENAI_MODEL__');
+
+    await manager.clearFromThread(state);
+
+    expect(agent.clearObjective).toHaveBeenCalledWith({ threadId: 'parent-thread' });
+    expect(state.session.thread.setSetting).toHaveBeenNthCalledWith(1, { key: 'goal', value: undefined });
+    expect(state.session.thread.setSetting).toHaveBeenNthCalledWith(2, {
+      key: 'goalCleanupBlocked',
+      value: undefined,
+    });
+    expect(agent.clearObjective.mock.invocationCallOrder[0]).toBeLessThan(
+      (state.session.thread.setSetting as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    );
+    expect(manager.getGoal()).toBeNull();
+  });
+
+  it('keeps the local goal when durable cleanup fails', async () => {
+    const agent = createAgent();
+    agent.clearObjective.mockRejectedValue(new Error('storage unavailable'));
+    const state = createState(agent);
+    const manager = new GoalManager();
+    await manager.setGoal(state, 'finish the task', '__GATEWAY_OPENAI_MODEL__');
+
+    await expect(manager.clearFromThread(state)).rejects.toThrow('storage unavailable');
+
+    expect(state.session.thread.setSetting).not.toHaveBeenCalled();
+    expect(manager.getGoal()).toMatchObject({ objective: 'finish the task', status: 'active' });
+  });
+
+  it('durably pauses the goal before reporting rollback completion', async () => {
+    const agent = createAgent();
+    agent.updateObjectiveOptions.mockResolvedValue(makeRecord({ status: 'paused' }));
+    const state = createState(agent);
+    const manager = new GoalManager();
+    await manager.setGoal(state, 'finish the task', '__GATEWAY_OPENAI_MODEL__');
+
+    await manager.pauseFromThread(state, 'Workflow activation failed.');
+
+    expect(agent.updateObjectiveOptions).toHaveBeenCalledWith({ threadId: 'parent-thread', status: 'paused' });
+    expect(state.session.thread.setSetting).toHaveBeenCalledWith({ key: 'goal', value: undefined });
+    expect(manager.getGoal()).toMatchObject({ status: 'paused' });
+  });
+
   it('loads an objective from ThreadState via the agent', async () => {
     const agent = createAgent();
     agent.getObjective.mockResolvedValue(makeRecord({ objective: 'persisted goal', runsUsed: 4, status: 'paused' }));

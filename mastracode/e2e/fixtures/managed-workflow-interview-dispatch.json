@@ -2,7 +2,7 @@
   "fixtures": [
     {
       "match": {
-        "userMessage": "Managed workflow interview e2e instructions.",
+        "turnIndex": 0,
         "model": "gpt-5.4-mini",
         "endpoint": "chat"
       },

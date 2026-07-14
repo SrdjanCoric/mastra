@@ -79,7 +79,7 @@ mastra workflow
 MastraCode asks what you want to do before it sends a model request:
 
 - **Run existing plan** starts a persistent goal for the unfinished tasks in `plans/PLAN.md`.
-- **Plan a new feature** collects the feature in the terminal, then starts the guided design interview. The workflow adds the agreed work to the plan before implementation begins.
+- **Plan a new feature** collects the feature in the terminal, then starts the persistent, unlimited workflow at the guided design interview. The workflow adds the agreed work to the plan before implementation begins.
 
 Telegram messages received during a run enter the same session, so MastraCode can answer them and continue the workflow.
 

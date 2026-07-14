@@ -5,13 +5,13 @@ import { expect } from './expect.js';
 import type { McE2eScenario } from './types.js';
 
 const FEATURE = 'Add reliable workflow startup';
-const SKILL_NAME = 'mastra-talk-it-through';
+const SKILL_NAME = 'mastra-workflow';
 const SKILL_INSTRUCTIONS = 'Managed workflow interview e2e instructions.';
 
 export const managedWorkflowInterviewDispatchScenario: McE2eScenario = {
   name: 'managed-workflow-interview-dispatch',
-  description: 'Collect a feature locally, then activate the talk-it-through skill through the real TUI.',
-  testName: 'activates mastra-talk-it-through after the user enters a feature',
+  description: 'Collect a feature locally, then activate the unbounded top-level workflow through the real TUI.',
+  testName: 'starts an unbounded managed workflow after the user enters a feature',
   projectFixture: 'long-branch',
   useOpenAIModel: true,
   aimockFixture: 'managed-workflow-interview-dispatch.json',
@@ -20,7 +20,7 @@ export const managedWorkflowInterviewDispatchScenario: McE2eScenario = {
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(
       join(skillDir, 'SKILL.md'),
-      `---\nname: ${SKILL_NAME}\ndescription: Guided feature interview\nuser-invocable: true\n---\n${SKILL_INSTRUCTIONS}\n`,
+      `---\nname: ${SKILL_NAME}\ndescription: End-to-end feature workflow\nuser-invocable: true\n---\n${SKILL_INSTRUCTIONS}\n`,
     );
   },
   async run({ terminal, runtime }) {
@@ -40,8 +40,11 @@ export const managedWorkflowInterviewDispatchScenario: McE2eScenario = {
   verifyAimockRequests(requests) {
     expect(requests).toHaveLength(1);
     const body = JSON.stringify(requests);
+    const normalizedBody = body.replaceAll('\\"', '"');
     expect(body).toContain(SKILL_NAME);
     expect(body).toContain(SKILL_INSTRUCTIONS);
     expect(body).toContain(`ARGUMENTS: ${FEATURE}`);
+    expect(normalizedBody).toMatch(/<current-objective[^>]*unbounded="true"/);
+    expect(normalizedBody).toContain(`mastra workflow ${FEATURE}`);
   },
 };

@@ -312,6 +312,45 @@ describe('handleGoalCommand', () => {
     });
   });
 
+  it('creates a missing thread before saving and triggering a new goal', async () => {
+    let currentThreadId: string | null = null;
+    const goal = {
+      id: 'goal-1',
+      objective: 'finish the task',
+      status: 'active' as const,
+      turnsUsed: 0,
+      maxTurns: 50,
+      judgeModelId: '__GATEWAY_OPENAI_MODEL__',
+    };
+    const goalManager = {
+      setGoal: vi.fn().mockResolvedValue(goal),
+      persistOnNextThreadCreate: vi.fn(),
+      saveToThread: vi.fn().mockResolvedValue(undefined),
+    };
+    const createThread = vi.fn(async () => {
+      currentThreadId = 'new-thread';
+      return { id: 'new-thread', resourceId: 'r', title: '', createdAt: new Date(), updatedAt: new Date() };
+    });
+    const sendSignal = vi.fn(() => ({ accepted: Promise.resolve({ accepted: true, runId: 'run-1' }) }));
+    const ctx = {
+      state: createMockState({
+        session: { thread: { getId: vi.fn(() => currentThreadId), create: createThread }, sendSignal },
+        extra: { pendingNewThread: false, goalManager },
+      }),
+      addUserMessage: vi.fn(),
+      showError: vi.fn(),
+      updateStatusLine: vi.fn(),
+    } as any;
+
+    await handleGoalCommand(ctx, ['finish', 'the', 'task']);
+
+    expect(createThread).toHaveBeenCalledOnce();
+    expect(goalManager.saveToThread).toHaveBeenCalledOnce();
+    expect(createThread.mock.invocationCallOrder[0]).toBeLessThan(goalManager.saveToThread.mock.invocationCallOrder[0]);
+    expect(goalManager.persistOnNextThreadCreate).not.toHaveBeenCalled();
+    expect(goalManager.saveToThread.mock.invocationCallOrder[0]).toBeLessThan(sendSignal.mock.invocationCallOrder[0]);
+  });
+
   it('starts a goal from a plan-approval-style title+plan with only the goal reminder XML', async () => {
     // Regression: plan approval "Use as /goal" must enter the same goal
     // lifecycle as `/goal <text>` and send only the goal reminder. Sending an
@@ -407,6 +446,45 @@ describe('handleGoalCommand', () => {
         judgeModelId: '__GATEWAY_OPENAI_MODEL__',
       },
     });
+  });
+
+  it('can persist an unbounded managed workflow before a separate skill message triggers it', async () => {
+    const objective = 'mastra workflow Add reliable workflow startup';
+    const goal = {
+      id: 'goal-1',
+      objective,
+      status: 'active' as const,
+      turnsUsed: 0,
+      maxTurns: 50,
+      unbounded: true,
+      judgeModelId: '__GATEWAY_OPENAI_MODEL__',
+    };
+    const goalManager = {
+      setGoal: vi.fn().mockResolvedValue(goal),
+      persistOnNextThreadCreate: vi.fn(),
+      resetActiveTimer: vi.fn(),
+      saveToThread: vi.fn().mockResolvedValue(undefined),
+    };
+    const sendSignal = vi.fn();
+    const ctx = {
+      state: createMockState({
+        threadId: 'thread-1',
+        session: { sendSignal },
+        extra: { pendingNewThread: false, goalManager },
+      }),
+      addUserMessage: vi.fn(),
+      showError: vi.fn(),
+      updateStatusLine: vi.fn(),
+    } as any;
+
+    await startManagedWorkflowGoal(ctx, objective, '__GATEWAY_OPENAI_MODEL__', { trigger: 'none' });
+
+    expect(goalManager.setGoal).toHaveBeenCalledWith(expect.anything(), objective, '__GATEWAY_OPENAI_MODEL__', 50, {
+      unbounded: true,
+    });
+    expect(goalManager.resetActiveTimer).toHaveBeenCalledOnce();
+    expect(goalManager.saveToThread).toHaveBeenCalledOnce();
+    expect(sendSignal).not.toHaveBeenCalled();
   });
 
   it('enters goal mode (active + persisted) before sending the trigger so the in-loop goal step runs', async () => {
@@ -634,6 +712,43 @@ describe('handleGoalCommand', () => {
     expect(showInfo).toHaveBeenCalledWith('Goal cleared.');
     // Not running → must not abort.
     expect(abort).not.toHaveBeenCalled();
+  });
+
+  it('retries durable cleanup and unblocks the session with /goal clear', async () => {
+    const goalManager = {
+      clearFromThread: vi.fn().mockResolvedValue(undefined),
+    };
+    const state = createMockState({
+      extra: {
+        goalManager,
+        goalCleanupBlocked: true,
+        planStartedGoalId: 'plan-goal-123',
+        pendingInlineQuestions: [],
+        pendingAskUserComponents: new Map(),
+      },
+    }) as any;
+    const ctx = { state, showInfo: vi.fn(), showError: vi.fn(), updateStatusLine: vi.fn() } as any;
+
+    await handleGoalCommand(ctx, ['clear']);
+
+    expect(goalManager.clearFromThread).toHaveBeenCalledWith(state);
+    expect(state.goalCleanupBlocked).toBe(false);
+    expect(state.planStartedGoalId).toBeUndefined();
+    expect(ctx.showInfo).toHaveBeenCalledWith('Goal cleared.');
+  });
+
+  it('keeps cleanup blocked when /goal clear cannot remove the durable goal', async () => {
+    const goalManager = {
+      clearFromThread: vi.fn().mockRejectedValue(new Error('storage unavailable')),
+    };
+    const state = createMockState({ extra: { goalManager, goalCleanupBlocked: true } }) as any;
+    const ctx = { state, showInfo: vi.fn(), showError: vi.fn(), updateStatusLine: vi.fn() } as any;
+
+    await handleGoalCommand(ctx, ['clear']);
+
+    expect(state.goalCleanupBlocked).toBe(true);
+    expect(ctx.showError).toHaveBeenCalledWith(expect.stringContaining('Goal cleanup is still blocked'));
+    expect(ctx.showInfo).not.toHaveBeenCalled();
   });
 
   it('aborts the in-flight turn when /goal clear is called while running', async () => {

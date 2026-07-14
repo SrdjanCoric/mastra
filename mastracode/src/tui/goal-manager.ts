@@ -49,6 +49,7 @@ export interface GoalState {
 
 export const DEFAULT_MAX_TURNS = 50;
 const THREAD_GOAL_KEY = 'goal';
+export const THREAD_GOAL_CLEANUP_BLOCKED_KEY = 'goalCleanupBlocked';
 
 // =============================================================================
 // GoalManager
@@ -214,6 +215,39 @@ export class GoalManager {
     this.activeStartedAt = null;
     this.activeDurationMs = 0;
     this.persistGoalOnNextThreadCreate = false;
+  }
+
+  /**
+   * Remove the durable objective before clearing the TUI view. Unlike
+   * saveToThread, this is a security-sensitive rollback path and reports
+   * storage failures to its caller.
+   */
+  async clearFromThread(state: TUIState): Promise<void> {
+    const threadId = state.session.thread.getId();
+    const agent = this.getAgent(state);
+    if (agent && threadId) {
+      await agent.clearObjective({ threadId });
+    }
+    await state.session.thread.setSetting({ key: THREAD_GOAL_KEY, value: undefined });
+    await state.session.thread.setSetting({ key: THREAD_GOAL_CLEANUP_BLOCKED_KEY, value: undefined });
+    this.clear();
+  }
+
+  /** Persist a paused objective and only return after the durable state agrees. */
+  async pauseFromThread(state: TUIState, reason: string): Promise<void> {
+    if (!this.record) return;
+    this.pause(reason);
+    const threadId = state.session.thread.getId();
+    const agent = this.getAgent(state);
+    if (!agent || !threadId) {
+      throw new Error('No active agent thread is available to pause the goal.');
+    }
+    const updated = await agent.updateObjectiveOptions({ threadId, status: 'paused' });
+    if (!updated) {
+      throw new Error('The durable goal could not be paused.');
+    }
+    this.record = { ...updated, id: this.record.id };
+    await state.session.thread.setSetting({ key: THREAD_GOAL_KEY, value: undefined });
   }
 
   /**

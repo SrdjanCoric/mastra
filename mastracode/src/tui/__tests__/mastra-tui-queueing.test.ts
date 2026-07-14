@@ -72,7 +72,10 @@ function createQueueState(overrides: Partial<TUIState> = {}): TUIState {
     sendSignal: vi.fn(() => ({ id: 'signal-1', accepted: Promise.resolve({ accepted: true, runId: 'run-1' }) })),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     displayState: { get: vi.fn(() => ({ isRunning: false })) },
-    thread: { create: vi.fn().mockResolvedValue({ id: 'thread-new' }) },
+    thread: {
+      create: vi.fn().mockResolvedValue({ id: 'thread-new' }),
+      setSetting: vi.fn().mockResolvedValue(undefined),
+    },
     mode: { switch: vi.fn().mockResolvedValue(undefined) },
     ...(sessionOverride ?? {}),
   };
@@ -156,7 +159,7 @@ describe('MastraTUI queueing', () => {
   beforeEach(() => {
     mocks.addUserMessage.mockReset();
     mocks.askModalQuestion.mockReset();
-    mocks.handleSkillCommand.mockReset().mockResolvedValue(undefined);
+    mocks.handleSkillCommand.mockReset().mockResolvedValue(true);
     mocks.showInfo.mockReset();
     mocks.showError.mockReset();
     mocks.startGoalWithDefaults.mockReset().mockResolvedValue(undefined);
@@ -167,6 +170,7 @@ describe('MastraTUI queueing', () => {
     const state = createQueueState({
       session: {
         run: { isRunning: vi.fn(() => false) },
+        suspensions: { hasPending: vi.fn(() => false) },
         model: { hasSelection: vi.fn(() => true), get: vi.fn(() => 'openai/gpt-5.2') },
       } as unknown as TUIState['session'],
     });
@@ -366,18 +370,22 @@ describe('MastraTUI queueing', () => {
 
     const handled = await tui.startManagedWorkflowGoalIfRequested('mastra workflow');
 
-    const featurePrompt = '/skill/mastra-talk-it-through Add reliable workflow startup';
+    const featurePrompt = '/skill/mastra-workflow Add reliable workflow startup';
+    const workflowObjective = 'mastra workflow Add reliable workflow startup';
     expect(handled).toBe(true);
     expect(mocks.askModalQuestion).toHaveBeenNthCalledWith(
       2,
       state.ui,
       expect.objectContaining({ question: 'What feature do you want to plan?' }),
     );
-    expect(runUserPromptHook).toHaveBeenCalledWith(featurePrompt);
-    expect(mocks.handleSkillCommand).toHaveBeenCalledWith(commandContext, 'mastra-talk-it-through', [
+    expect(runUserPromptHook).toHaveBeenNthCalledWith(1, workflowObjective);
+    expect(runUserPromptHook).toHaveBeenNthCalledWith(2, featurePrompt);
+    expect(mocks.startManagedWorkflowGoal).toHaveBeenCalledWith(commandContext, workflowObjective, 'openai/gpt-5.2', {
+      trigger: 'none',
+    });
+    expect(mocks.handleSkillCommand).toHaveBeenCalledWith(commandContext, 'mastra-workflow', [
       'Add reliable workflow startup',
     ]);
-    expect(mocks.startManagedWorkflowGoal).not.toHaveBeenCalled();
   });
 
   it('dispatches a feature into the shared run when another message starts during the feature prompt', async () => {
@@ -410,8 +418,14 @@ describe('MastraTUI queueing', () => {
 
     expect(handled).toBe(true);
     expect(isRunning).toHaveBeenCalledOnce();
-    expect(runUserPromptHook).toHaveBeenCalledOnce();
-    expect(mocks.handleSkillCommand).toHaveBeenCalledWith(commandContext, 'mastra-talk-it-through', [
+    expect(runUserPromptHook).toHaveBeenCalledTimes(2);
+    expect(mocks.startManagedWorkflowGoal).toHaveBeenCalledWith(
+      commandContext,
+      'mastra workflow Add reliable workflow startup',
+      'openai/gpt-5.2',
+      { trigger: 'none' },
+    );
+    expect(mocks.handleSkillCommand).toHaveBeenCalledWith(commandContext, 'mastra-workflow', [
       'Add reliable workflow startup',
     ]);
     expect(onRejected).not.toHaveBeenCalled();
@@ -449,11 +463,124 @@ describe('MastraTUI queueing', () => {
 
     expect(handled).toBe(true);
     expect(isRunning).toHaveBeenCalledOnce();
-    expect(runUserPromptHook).toHaveBeenCalledOnce();
-    expect(mocks.handleSkillCommand).toHaveBeenCalledWith(commandContext, 'mastra-talk-it-through', [
+    expect(runUserPromptHook).toHaveBeenCalledTimes(2);
+    expect(mocks.startManagedWorkflowGoal).toHaveBeenCalledWith(
+      commandContext,
+      'mastra workflow Add reliable workflow startup',
+      'openai/gpt-5.2',
+      { trigger: 'none' },
+    );
+    expect(mocks.handleSkillCommand).toHaveBeenCalledWith(commandContext, 'mastra-workflow', [
       'Add reliable workflow startup',
     ]);
     expect(onRejected).not.toHaveBeenCalled();
+  });
+
+  it('rejects the canonical feature objective before creating an unlimited goal', async () => {
+    mocks.askModalQuestion
+      .mockResolvedValueOnce('Plan a new feature')
+      .mockResolvedValueOnce('Add reliable workflow startup');
+    const state = createQueueState({
+      session: {
+        run: { isRunning: vi.fn(() => false) },
+        model: { hasSelection: vi.fn(() => true), get: vi.fn(() => 'openai/gpt-5.2') },
+      } as unknown as TUIState['session'],
+    });
+    const commandContext = { state };
+    const onRejected = vi.fn();
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: TUIState;
+      startManagedWorkflowGoalIfRequested: (content: string, options?: { onRejected?: () => void }) => Promise<boolean>;
+      runUserPromptHook: (content: string) => Promise<boolean>;
+      buildCommandContext: () => typeof commandContext;
+    };
+    tui.state = state;
+    tui.runUserPromptHook = vi.fn().mockResolvedValue(false);
+    tui.buildCommandContext = vi.fn(() => commandContext);
+
+    const handled = await tui.startManagedWorkflowGoalIfRequested('mastra workflow', { onRejected });
+
+    expect(handled).toBe(true);
+    expect(tui.runUserPromptHook).toHaveBeenCalledWith('mastra workflow Add reliable workflow startup');
+    expect(mocks.startManagedWorkflowGoal).not.toHaveBeenCalled();
+    expect(mocks.handleSkillCommand).not.toHaveBeenCalled();
+    expect(onRejected).toHaveBeenCalledOnce();
+  });
+
+  it('clears the unlimited goal when top-level workflow activation fails', async () => {
+    mocks.askModalQuestion
+      .mockResolvedValueOnce('Plan a new feature')
+      .mockResolvedValueOnce('Add reliable workflow startup');
+    mocks.handleSkillCommand.mockResolvedValueOnce(false);
+    const goalManager = {
+      stopActiveTimer: vi.fn(),
+      clearFromThread: vi.fn().mockResolvedValue(undefined),
+    };
+    const state = createQueueState({
+      goalManager: goalManager as unknown as TUIState['goalManager'],
+      session: {
+        run: { isRunning: vi.fn(() => false) },
+        suspensions: { hasPending: vi.fn(() => false) },
+        model: { hasSelection: vi.fn(() => true), get: vi.fn(() => 'openai/gpt-5.2') },
+      } as unknown as TUIState['session'],
+    });
+    const updateStatusLine = vi.fn();
+    const commandContext = { state, updateStatusLine };
+    const onRejected = vi.fn();
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: TUIState;
+      startManagedWorkflowGoalIfRequested: (content: string, options?: { onRejected?: () => void }) => Promise<boolean>;
+      runUserPromptHook: (content: string) => Promise<boolean>;
+      buildCommandContext: () => typeof commandContext;
+    };
+    tui.state = state;
+    tui.runUserPromptHook = vi.fn().mockResolvedValue(true);
+    tui.buildCommandContext = vi.fn(() => commandContext);
+
+    const handled = await tui.startManagedWorkflowGoalIfRequested('mastra workflow', { onRejected });
+
+    expect(handled).toBe(true);
+    expect(goalManager.clearFromThread).toHaveBeenCalledWith(state);
+    expect(updateStatusLine).toHaveBeenCalledOnce();
+    expect(onRejected).toHaveBeenCalledOnce();
+  });
+
+  it('blocks new work when failed activation cannot remove the durable goal', async () => {
+    mocks.askModalQuestion
+      .mockResolvedValueOnce('Plan a new feature')
+      .mockResolvedValueOnce('Add reliable workflow startup');
+    mocks.handleSkillCommand.mockResolvedValueOnce(false);
+    const cleanupError = new Error('storage unavailable');
+    const goalManager = {
+      stopActiveTimer: vi.fn(),
+      clearFromThread: vi.fn().mockRejectedValue(cleanupError),
+      pauseFromThread: vi.fn().mockResolvedValue(undefined),
+    };
+    const state = createQueueState({
+      goalManager: goalManager as unknown as TUIState['goalManager'],
+      session: {
+        run: { isRunning: vi.fn(() => false) },
+        suspensions: { hasPending: vi.fn(() => false) },
+        model: { hasSelection: vi.fn(() => true), get: vi.fn(() => 'openai/gpt-5.2') },
+      } as unknown as TUIState['session'],
+    });
+    const commandContext = { state, updateStatusLine: vi.fn(), showError: vi.fn() };
+    const tui = Object.create(MastraTUI.prototype) as {
+      state: TUIState;
+      startManagedWorkflowGoalIfRequested: (content: string) => Promise<boolean>;
+      runUserPromptHook: (content: string) => Promise<boolean>;
+      buildCommandContext: () => typeof commandContext;
+    };
+    tui.state = state;
+    tui.runUserPromptHook = vi.fn().mockResolvedValue(true);
+    tui.buildCommandContext = vi.fn(() => commandContext);
+
+    await tui.startManagedWorkflowGoalIfRequested('mastra workflow');
+
+    expect(goalManager.pauseFromThread).toHaveBeenCalledOnce();
+    expect(state.goalCleanupBlocked).toBe(true);
+    expect(commandContext.updateStatusLine).toHaveBeenCalledOnce();
+    expect(commandContext.showError).toHaveBeenCalledWith(expect.stringContaining('New work is blocked'));
   });
 
   it('reports a managed-workflow start failure after acknowledging its Telegram message', async () => {
@@ -1562,7 +1689,7 @@ describe('syncInitialThreadState', () => {
         thread: {
           getId: vi.fn(() => 'thread-1'),
           list: vi.fn().mockResolvedValue([
-            { id: 'thread-1', title: 'PR triage', metadata: { goal: persistedGoal } },
+            { id: 'thread-1', title: 'PR triage', metadata: { goal: persistedGoal, goalCleanupBlocked: true } },
             { id: 'thread-2', title: 'Other thread', metadata: {} },
           ]),
         },
@@ -1581,8 +1708,12 @@ describe('syncInitialThreadState', () => {
     await syncInitialThreadState(state);
 
     expect(state.currentThreadTitle).toBe('PR triage');
+    expect(state.goalCleanupBlocked).toBe(true);
     expect(state.goalManager.loadFromThread).toHaveBeenCalledWith(state);
-    expect(state.goalManager.loadFromThreadMetadata).toHaveBeenCalledWith({ goal: persistedGoal });
+    expect(state.goalManager.loadFromThreadMetadata).toHaveBeenCalledWith({
+      goal: persistedGoal,
+      goalCleanupBlocked: true,
+    });
     expect(state.session.sendMessage).not.toHaveBeenCalled();
   });
 
