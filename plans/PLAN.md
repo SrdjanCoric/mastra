@@ -29,6 +29,7 @@ This is the project's master plan: a durable architectural header plus an ordere
 - **Publication**: the publication gate requires focused unit/integration tests, concurrent multi-project broker coverage, TUI end-to-end coverage, isolated package verification, and one manual live Telegram test; a separate final task publishes the approved package to npm.
 - **Repository and release security**: fork-owned GitHub-hosted validation protects `main`; npm releases use trusted publishing with provenance and no long-lived npm token. Inherited workflows that require unavailable private infrastructure remain disabled.
 - **Active-task display performance**: live output keeps the current 1,000-line and 64-KiB capacity. Intermediate shell, tool, and subagent text uses adaptive display batching while errors, prompts, lifecycle events, user input, cancellation, and final results remain immediate.
+- **Session hardening (supersedes the earlier output, remote-command, and recovery details where they conflict)**: MastraCode keeps its original Ctrl+C interaction, but every TUI exit releases its project lease and owned processes; the shared Telegram broker and all retry work end after the final live TUI. Telegram receives direct replies to Telegram-originated messages plus meaningful goal-state changes, supports non-terminating `/stop` and confirmed project-scoped `/exit`, never replays stale work after a later launch, and managed workflow run metadata remains internal and non-limiting. Telegram-specific privacy must not broaden the original MastraCode agent security model.
 
 ---
 
@@ -62,3 +63,7 @@ This is the project's master plan: a durable architectural header plus an ordere
 - [x] 0027 · Send images during active runs (after 0026) → tasks/done/0027-send-images-during-active-runs.md
 - [x] 0028 · Speed up managed workflow judging (after 0027) → tasks/done/0028-speed-up-managed-workflow-judge.md
 - [~] 0029 · Start workflow interview before goal creation (after 0028) → tasks/0029-start-workflow-interview-before-goal.md
+- [ ] 0030 · Shut down Telegram and TUI-owned processes deterministically (after 0029) → tasks/0030-shut-down-telegram-processes-deterministically.md
+- [ ] 0031 · Route Telegram replies and remote session controls explicitly (after 0030) → tasks/0031-route-telegram-replies-and-session-controls.md
+- [ ] 0032 · Make managed workflow attempts failure-only and invisible (after 0031) → tasks/0032-make-managed-workflow-attempts-failure-only.md
+- [ ] 0033 · Harden Telegram privacy within the original security model (after 0031) → tasks/0033-harden-telegram-privacy-within-original-model.md

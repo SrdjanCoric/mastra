@@ -39,7 +39,6 @@ gh-new-pr
 gh-pr-comments
 make-moves
 
-Read relevant @.claude/skills/
 playground-msw-tests PRIMARY test approach for packages/playground packages/playground-ui
 e2e-tests-studio SECONDARY test approach for packages/playground-ui packages/playground
 mastra-docs
