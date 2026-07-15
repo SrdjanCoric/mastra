@@ -75,11 +75,15 @@ export async function handleSkillsCommand(ctx: SlashCommandContext): Promise<voi
   }
 }
 
-export async function handleSkillCommand(ctx: SlashCommandContext, skillName: string, args: string[]): Promise<void> {
+export async function handleSkillCommand(
+  ctx: SlashCommandContext,
+  skillName: string,
+  args: string[],
+): Promise<boolean> {
   const normalizedSkillName = skillName.trim();
   if (!normalizedSkillName) {
     ctx.showError('Usage: /skill/<name>');
-    return;
+    return false;
   }
 
   let workspace;
@@ -87,12 +91,12 @@ export async function handleSkillCommand(ctx: SlashCommandContext, skillName: st
     workspace = await resolveWorkspace(ctx);
   } catch (error) {
     ctx.showError(`Failed to resolve workspace: ${error instanceof Error ? error.message : String(error)}`);
-    return;
+    return false;
   }
 
   if (!workspace?.skills) {
     ctx.showError('No skills configured.');
-    return;
+    return false;
   }
 
   try {
@@ -101,14 +105,14 @@ export async function handleSkillCommand(ctx: SlashCommandContext, skillName: st
       const skills = (await workspace.skills.list()).filter(isUserInvocable);
       const available = skills.length ? ` Available skills: ${skills.map(s => s.name).join(', ')}` : '';
       ctx.showError(`Skill not found: ${normalizedSkillName}.${available}`);
-      return;
+      return false;
     }
 
     const trimmedArgs = args.join(' ').trim();
     const content = `${formatSkillActivation(skill)}${trimmedArgs ? `\n\nARGUMENTS: ${trimmedArgs}` : ''}`.trim();
     if (!content) {
       ctx.showInfo(`Activated /skill/${skill.name} (no instructions)`);
-      return;
+      return true;
     }
 
     if (!isCurrentThreadActive(ctx)) {
@@ -127,9 +131,11 @@ export async function handleSkillCommand(ctx: SlashCommandContext, skillName: st
         renderIdleUserMessage: false,
       },
     );
+    return true;
   } catch (error) {
     ctx.showError(
       `Error executing /skill/${normalizedSkillName}: ${error instanceof Error ? error.message : String(error)}`,
     );
+    return false;
   }
 }

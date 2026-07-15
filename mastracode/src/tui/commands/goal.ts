@@ -98,9 +98,21 @@ export async function handleGoalCommand(ctx: SlashCommandContext, args: string[]
 
   // /goal clear
   if (subCommand === 'clear') {
-    goalManager.clear();
+    if (state.goalCleanupBlocked) {
+      try {
+        await goalManager.clearFromThread(state);
+        state.goalCleanupBlocked = false;
+      } catch (error) {
+        ctx.showError(
+          `Goal cleanup is still blocked: ${error instanceof Error ? error.message : String(error)}. Try /goal clear again.`,
+        );
+        return;
+      }
+    } else {
+      goalManager.clear();
+      await goalManager.saveToThread(state);
+    }
     state.planStartedGoalId = undefined;
-    await goalManager.saveToThread(state);
     // Abort any in-flight turn. The cleared objective stops the core loop from
     // driving *new* goal continuations, but a turn that was already running when
     // the user cleared keeps going to completion — which reads as "it's still
@@ -248,8 +260,9 @@ export async function startManagedWorkflowGoal(
   ctx: SlashCommandContext,
   objective: string,
   judgeModelId: string,
+  options: Pick<StartGoalOptions, 'trigger'> = {},
 ): Promise<boolean> {
-  return startGoal(ctx, objective, judgeModelId, DEFAULT_MAX_TURNS, { unbounded: true });
+  return startGoal(ctx, objective, judgeModelId, DEFAULT_MAX_TURNS, { ...options, unbounded: true });
 }
 
 function getJudgeDefaults(): JudgeDefaults | null {
@@ -336,7 +349,11 @@ async function startGoal(
   const { state } = ctx;
   const goalManager = state.goalManager;
 
-  if (state.pendingNewThread) {
+  // Persist the objective before its first model turn. If the session has no
+  // thread yet, relying on sendSignal to create one races the in-loop goal step:
+  // the first answer can finish before the thread-created handler saves the
+  // objective, so the judge never sees that turn.
+  if (state.pendingNewThread || !state.session.thread.getId()) {
     await state.session.thread.create();
     state.pendingNewThread = false;
   }

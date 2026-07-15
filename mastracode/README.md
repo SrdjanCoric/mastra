@@ -76,15 +76,20 @@ Use the terminal TUI normally. Messages sent in the project topic enter the same
 mastra workflow
 ```
 
-MastraCode starts the workflow as a persistent goal. It settles the design with you, writes a task plan, and works through implementation, review, pull request merge, and local sync. If you send a Telegram message during the run, MastraCode answers it and continues the workflow.
+MastraCode asks what you want to do before it sends a model request:
 
-If a task plan already exists, tell it:
+- **Run existing plan** starts a persistent goal for the unfinished tasks in `plans/PLAN.md`.
+- **Plan a new feature** collects the feature in the terminal, then starts the persistent, unlimited workflow at the guided design interview. The workflow adds the agreed work to the plan before implementation begins.
+
+Telegram messages received during a run enter the same session, so MastraCode can answer them and continue the workflow.
+
+To skip the choice and start the existing plan directly, tell it:
 
 ```text
 mastra workflow --run
 ```
 
-The `--run` option skips the interview and planning stages and starts with the unfinished tasks.
+The `--run` option starts the same persistent goal used by **Run existing plan**.
 
 Rerun `mastracode-remote --init` to restore or update the packaged workflow skills. Local changes to a packaged skill are backed up before replacement.
 

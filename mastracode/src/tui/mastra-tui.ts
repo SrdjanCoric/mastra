@@ -46,6 +46,7 @@ import {
 import { insertChatComponentWithBoundarySpacing } from './chat-boundary-reconciliation.js';
 import { dispatchSlashCommand } from './command-dispatch.js';
 import { startGoalWithDefaults, startManagedWorkflowGoal } from './commands/goal.js';
+import { handleSkillCommand } from './commands/skills.js';
 
 import type { SlashCommandContext } from './commands/types.js';
 import { AskQuestionInlineComponent } from './components/ask-question-inline.js';
@@ -58,11 +59,12 @@ import type { IToolExecutionComponent } from './components/tool-execution-interf
 import { showError, showInfo, showFormattedError, notify } from './display.js';
 import { dispatchEvent } from './event-dispatch.js';
 import { isGoalJudgeInputLocked, showGoalJudgeInputLockInfo } from './goal-input-lock.js';
+import { THREAD_GOAL_CLEANUP_BLOCKED_KEY } from './goal-manager.js';
 import type { EventHandlerContext } from './handlers/types.js';
 import { InteractivePromptBridge } from './interactive-prompt-bridge.js';
 import { InterjectionReplyTracker, shouldSendAssistantReplyToTelegram } from './interjection-reply-tracker.js';
 import type { InterjectionReplyOrigin } from './interjection-reply-tracker.js';
-import { parseManagedWorkflowGoal } from './managed-workflow-goal.js';
+import { isManagedWorkflowPrompt, parseManagedWorkflowGoal } from './managed-workflow-goal.js';
 import { askModalQuestion } from './modal-question.js';
 import { showModalOverlay } from './overlay.js';
 import { promptForApiKeyIfNeeded } from './prompt-api-key.js';
@@ -139,6 +141,7 @@ export async function syncInitialThreadState(state: TUIState): Promise<void> {
     state.currentThreadTitle = initThread.title;
   }
   const metadata = initThread?.metadata as Record<string, unknown> | undefined;
+  state.goalCleanupBlocked = metadata?.[THREAD_GOAL_CLEANUP_BLOCKED_KEY] === true;
   state.activeGithubPrSubscriptions = getGithubPrSubscriptionsFromMetadata(metadata);
   // Prefer the durable ThreadState objective; fall back to the legacy
   // thread-metadata goal for threads created before the migration.
@@ -362,6 +365,11 @@ export class MastraTUI {
       try {
         const pendingNewThread = this.state.pendingNewThread;
 
+        if (this.state.goalCleanupBlocked && userInput.trim().toLowerCase() !== '/goal clear') {
+          showError(this.state, 'Goal cleanup is blocked. Use /goal clear before sending another message.');
+          continue;
+        }
+
         // Handle slash commands
         if (userInput.startsWith('/')) {
           const handled = await this.handleSlashCommand(userInput);
@@ -514,8 +522,9 @@ export class MastraTUI {
     content: string,
     options?: { label?: string; onRejected?: () => void },
   ): Promise<boolean> {
-    const objective = parseManagedWorkflowGoal(content);
-    if (!objective || this.state.session.run.isRunning()) return false;
+    let objective = parseManagedWorkflowGoal(content);
+    const shouldChooseMode = !options?.label && isManagedWorkflowPrompt(content);
+    if ((!objective && !shouldChooseMode) || this.state.session.run.isRunning()) return false;
 
     if (!this.state.session.model.hasSelection()) {
       showInfo(this.state, 'No model selected. Use /models to select a model, or /login to authenticate.');
@@ -523,11 +532,99 @@ export class MastraTUI {
       return true;
     }
 
+    if (shouldChooseMode) {
+      const mode = await askModalQuestion(this.state.ui, {
+        question: 'What would you like Mastra workflow to do?',
+        options: [
+          {
+            label: 'Run existing plan',
+            description: 'Continue the tasks already listed in plans/PLAN.md.',
+          },
+          {
+            label: 'Plan a new feature',
+            description: 'Start a guided interview, then add tasks to the plan.',
+          },
+        ],
+        selectedOptionLabel: 'Run existing plan',
+      });
+      if (!mode) return true;
+
+      if (mode === 'Plan a new feature') {
+        const feature = await askModalQuestion(this.state.ui, {
+          question: 'What feature do you want to plan?',
+        });
+        if (!feature?.trim()) return true;
+
+        const trimmedFeature = feature.trim();
+        const workflowObjective = `mastra workflow ${trimmedFeature}`;
+        const featurePrompt = `/skill/mastra-workflow ${trimmedFeature}`;
+        if (!(await this.runUserPromptHook(workflowObjective))) {
+          options?.onRejected?.();
+          return true;
+        }
+        if (!(await this.runUserPromptHook(featurePrompt))) {
+          options?.onRejected?.();
+          return true;
+        }
+        const commandContext = this.buildCommandContext();
+        const started = await startManagedWorkflowGoal(
+          commandContext,
+          workflowObjective,
+          this.state.session.model.get()!,
+          { trigger: 'none' },
+        );
+        if (!started) {
+          options?.onRejected?.();
+          return true;
+        }
+        const activated = await handleSkillCommand(commandContext, 'mastra-workflow', [trimmedFeature]);
+        if (!activated) {
+          const cleanupReason = 'Workflow activation failed and durable cleanup is blocked.';
+          this.state.goalCleanupBlocked = true;
+          if (this.state.session.run.isRunning() || this.state.session.suspensions.hasPending()) {
+            this.state.activeInlineQuestion = undefined;
+            this.state.pendingInlineQuestions.length = 0;
+            this.state.pendingAskUserComponents.clear();
+            this.state.userInitiatedAbort = true;
+            this.state.session.abort();
+          }
+          let quarantineError: unknown;
+          try {
+            await this.state.session.thread.setSetting({ key: THREAD_GOAL_CLEANUP_BLOCKED_KEY, value: true });
+          } catch (quarantineFailure) {
+            quarantineError = quarantineFailure;
+          }
+          try {
+            await this.state.goalManager.clearFromThread(this.state);
+            this.state.goalCleanupBlocked = false;
+            commandContext.updateStatusLine();
+          } catch (error) {
+            let pauseError: unknown;
+            try {
+              await this.state.goalManager.pauseFromThread(this.state, cleanupReason);
+            } catch (pauseFailure) {
+              pauseError = pauseFailure;
+            }
+            commandContext.updateStatusLine();
+            commandContext.showError(
+              `Workflow activation failed, and the unlimited goal could not be removed. New work is blocked; use /goal clear before sending another message. ${error instanceof Error ? error.message : String(error)}${pauseError ? ` Durable pause also failed: ${pauseError instanceof Error ? pauseError.message : String(pauseError)}` : ''}${quarantineError ? ` Quarantine persistence also failed: ${quarantineError instanceof Error ? quarantineError.message : String(quarantineError)}` : ''}`,
+            );
+          }
+          options?.onRejected?.();
+        }
+        return true;
+      }
+
+      if (mode !== 'Run existing plan') return true;
+      objective = 'mastra workflow --run';
+    }
+    if (!objective) return false;
+
     const messageId = `user-${Date.now()}`;
     addUserMessage(this.state, this.createUserSignalMessage(content, undefined, messageId), options);
     this.state.ui.requestRender();
 
-    const allowed = await this.runUserPromptHook(content);
+    const allowed = await this.runUserPromptHook(objective);
     if (!allowed) {
       this.removeOptimisticUserMessage(messageId);
       options?.onRejected?.();
@@ -676,6 +773,21 @@ export class MastraTUI {
   }
 
   private async receiveExternalMessage(message: TUIBridgeIncomingMessage): Promise<void> {
+    if (this.state.goalCleanupBlocked) {
+      const blockedInput = parseTelegramCommand(message.text);
+      if (blockedInput.type === 'command') {
+        await this.handleTelegramCommand(blockedInput.command);
+        return;
+      }
+      if (blockedInput.type === 'unsupported') {
+        await this.sendTelegramControlMessage(formatUnsupportedTelegramCommand(blockedInput.command));
+        return;
+      }
+      showError(this.state, 'Goal cleanup is blocked. Use /goal clear in the terminal before sending another message.');
+      await this.sendTelegramControlMessage(formatTelegramMessageFailure('failed'));
+      return;
+    }
+
     if (await this.state.interactivePromptBridge?.receiveMessage(message)) return;
 
     const input = parseTelegramCommand(message.text);

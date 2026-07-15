@@ -11,6 +11,18 @@ Software Repository Guidelines assessment passes, or the user sends an explicit 
 recovered autonomously or escalated through the active
 user-input channel without ending the run.
 
+## Startup dispatch
+
+Act on the invocation before inspecting the repository or master plan.
+
+- For `mastra workflow --run`, skip interview and planning and begin at **Run an existing plan**.
+- For bare `mastra workflow`, ask the user to choose **Run existing plan** or **Plan a new feature** before
+  inspecting the repository, reading the master plan, or creating a goal. If they choose the existing plan,
+  begin at **Run an existing plan**. If they choose a new feature, ask what they want to plan and then invoke
+  `mastra-talk-it-through` with that feature as the next tool call.
+- If the invocation already names a feature to plan, invoke `mastra-talk-it-through` with that feature as the
+  next tool call without asking for the startup mode again.
+
 ## Skills invoked by this workflow
 
 The workflow must invoke the MastraCode-specific skills below by their exact IDs. Do not substitute
@@ -180,19 +192,19 @@ assessment ends the workflow. A user reply resumes the same process; do not requ
   the current folder or `CLAUDE.md`, then run the implementation loop until all tasks are done or
   the user explicitly stops it.
 
-Default behavior depends on whether a plan already exists:
+Startup dispatch determines when repository inspection begins:
 
-- **No master plan yet** → run all three stages: `mastra-talk-it-through` → `mastra-to-plan` → loop.
-- **Master plan exists and `--run` is present** → skip straight to stage 3 and implement existing
-  tasks one by one until the plan is complete.
-- **Master plan exists and `--run` is absent** → treat this invocation as "add a feature": run
-  `mastra-talk-it-through`, then `mastra-to-plan` appends new dependency-aware tasks to the existing
-  plan, then stage 3 implements from the first eligible pointer.
+- **Bare invocation** → ask for the startup mode before repository inspection. If the user chooses
+  **Run existing plan**, begin at stage 3. If the user chooses **Plan a new feature**, collect the feature
+  and invoke `mastra-talk-it-through` before inspecting the repository.
+- **Invocation with a feature** → invoke `mastra-talk-it-through` with that feature without asking for the
+  startup mode.
+- **`--run` invocation** → read the existing master plan and begin at stage 3.
 
-Read `AGENTS.md` in the current folder first, then `CLAUDE.md`, to detect the master plan. If no
-plan path is recorded and the project has no plan yet, start at stage 1. If no plan path is recorded
-but plan files appear to exist, ask the user which plan to register through the available input tool,
-wait for the reply, register it, and continue.
+For `--run` or **Run existing plan**, read `AGENTS.md` in the current folder first, then `CLAUDE.md`, to
+locate the master plan. For **Plan a new feature**, `mastra-talk-it-through` owns repository inspection
+and plan discovery. If the interview finds plan files but no registered plan path, ask which plan to
+register through the available input tool, wait for the reply, register it, and continue.
 
 ## Rules
 

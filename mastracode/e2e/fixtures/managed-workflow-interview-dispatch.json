@@ -1,0 +1,14 @@
+{
+  "fixtures": [
+    {
+      "match": {
+        "turnIndex": 0,
+        "model": "gpt-5.4-mini",
+        "endpoint": "chat"
+      },
+      "response": {
+        "content": "Managed workflow interview activated."
+      }
+    }
+  ]
+}

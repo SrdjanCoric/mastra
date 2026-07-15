@@ -230,6 +230,8 @@ export interface TUIState {
   quietModeMaxToolPreviewLines: number;
   /** Active goal judge status-line override while evaluating the last turn. */
   activeGoalJudge?: { modelId: string; abortController: AbortController; component: JudgeDisplayComponent };
+  /** Blocks new work when a failed workflow activation could not remove its durable goal. */
+  goalCleanupBlocked?: boolean;
 
   // ── Thread / conversation ─────────────────────────────────────────────
   /** True when we want a new thread but haven't created it yet */
