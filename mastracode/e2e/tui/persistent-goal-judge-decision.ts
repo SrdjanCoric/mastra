@@ -30,7 +30,7 @@ export const persistentGoalJudgeDecisionScenario: McE2eScenario = {
     await (expect(terminal.getByText(/Project:|Resource ID:|>/gi, { full: true, strict: false })) as any).toBeVisible();
 
     terminal.submit(OBJECTIVE);
-    await runtime.waitForScreenText(/pursuing goal/i, terminal, 8_000);
+    await runtime.waitForScreenText(/First autonomous/i, terminal, 8_000);
     terminal.submit(STATUS_MESSAGE);
 
     await runtime.waitForScreenText(/Status received; autonomous work will continue/i, terminal, 15_000);

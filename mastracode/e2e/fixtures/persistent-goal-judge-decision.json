@@ -4,6 +4,16 @@
       "match": {
         "endpoint": "chat",
         "model": "gpt-5.4-mini",
+        "userMessage": "First autonomous workflow task completed."
+      },
+      "response": {
+        "content": "{\"decision\":\"continue\",\"reason\":\"Continue autonomous goal work while accepting an active status interjection.\"}"
+      }
+    },
+    {
+      "match": {
+        "endpoint": "chat",
+        "model": "gpt-5.4-mini",
         "userMessage": "Status received; autonomous work will continue."
       },
       "response": {
@@ -26,6 +36,11 @@
         "model": "gpt-5.4-mini",
         "userMessage": "mastra workflow --run",
         "sequenceIndex": 0
+      },
+      "chunkSize": 4,
+      "streamingProfile": {
+        "ttft": 500,
+        "tps": 4
       },
       "response": {
         "content": "First autonomous workflow task completed."
