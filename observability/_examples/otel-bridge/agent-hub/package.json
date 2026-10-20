@@ -30,7 +30,7 @@
     "@opentelemetry/host-metrics": "0.37.0",
     "@opentelemetry/instrumentation": "0.208.0",
     "@opentelemetry/resources": "2.2.0",
-    "@opentelemetry/sdk-node": "0.208.0",
+    "@opentelemetry/sdk-node": "0.217.0",
     "@opentelemetry/semantic-conventions": "^1.40.0",
     "fastify": "5.8.5",
     "fastify-plugin": "5.0.1",
